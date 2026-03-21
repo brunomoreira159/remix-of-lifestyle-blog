@@ -1,42 +1,23 @@
-import { Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
+import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "@/contexts/ThemeContext";
 
-const ThemeToggle = () => {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
-
-  const toggleTheme = () => {
-    if (theme === 'system') {
-      // If currently system, switch to the opposite of what system would be
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      setTheme(systemTheme === 'dark' ? 'light' : 'dark');
-    } else {
-      setTheme(theme === 'light' ? 'dark' : 'light');
-    }
-  };
+export const ThemeToggle = () => {
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="icon"
       onClick={toggleTheme}
-      className="h-9 w-9 p-0"
+      className="rounded-full"
       aria-label="Toggle theme"
     >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      {theme === "light" ? (
+        <Moon className="h-5 w-5" />
+      ) : (
+        <Sun className="h-5 w-5" />
+      )}
     </Button>
   );
 };
-
-export default ThemeToggle;

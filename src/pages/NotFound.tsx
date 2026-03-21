@@ -1,72 +1,40 @@
-import { useLocation, Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import { FileQuestion, MessageCircle } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
+    console.error(
+      "404 Error: Rota não existente acessada:",
+      location.pathname
+    );
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="flex flex-col items-center justify-center px-4 py-16 text-center">
-        <div className="max-w-2xl mx-auto">
-          {/* Large 404 */}
-          <h1 className="text-8xl md:text-9xl font-bold text-foreground/20 mb-8 select-none">
-            404
-          </h1>
-          
-          {/* Main heading */}
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Page Not Found
-          </h2>
-          
-          {/* Description */}
-          <p className="text-lg text-muted-foreground mb-8 max-w-lg mx-auto leading-relaxed">
-            Sorry, we couldn't find the page you're looking for. It might have been moved, deleted, or the URL was mistyped.
-          </p>
-          
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button asChild size="lg">
-              <Link to="/">
-                Return to Home
-              </Link>
-            </Button>
-            
-            <Button variant="outline" asChild size="lg">
-              <Link to="/posts">
-                Browse All Posts
-              </Link>
-            </Button>
-          </div>
-          
-          {/* Helpful links */}
-          <div className="mt-12 pt-8 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-4">
-              You might be looking for:
-            </p>
-            <div className="flex flex-wrap justify-center gap-6 text-sm">
-              <Link to="/" className="text-foreground hover:text-primary transition-colors">
-                Homepage
-              </Link>
-              <Link to="/posts" className="text-foreground hover:text-primary transition-colors">
-                All Posts
-              </Link>
-              <Link to="/business" className="text-foreground hover:text-primary transition-colors">
-                Business Articles
-              </Link>
-            </div>
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="text-center max-w-md">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-muted mb-8">
+          <FileQuestion className="h-12 w-12 text-muted-foreground" />
         </div>
-      </main>
-      <Footer />
+        <h1 className="text-4xl font-bold mb-4">Página não existe ou está em processo de desenvolvimento</h1>
+        <p className="text-xl text-muted-foreground mb-8">
+          Desculpe, a página está inacessível. Favor entrar em contato com desenvolvedor do sistema.
+        </p>
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <Button asChild>
+            <a href="/">Voltar para o Início</a>
+          </Button>
+          <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" asChild>
+            <a href="https://wa.me/5562993046419?text=Olá. Estou entrando em contato devido eu não estar conseguindo acessar uma página no Sistema de Gestão de Estoque Fricó. Poderia me ajudar?" target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Contato via WhatsApp
+            </a>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

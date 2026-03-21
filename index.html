@@ -1,51 +1,134 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="/src/assets/hero-image.jpg" as="image" type="image/jpeg" fetchpriority="high">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="/src/styles/print.css" media="print">
-    <title>Nexus - Personal Blog | Fashion, Technology &amp; Lifestyle</title>
-    <meta name="description" content="Explore the latest in fashion trends, technology insights, business strategies, and lifestyle inspiration on Nexus personal blog.">
-    <meta name="author" content="Nexus Blog" />
-    <link rel="canonical" href="https://nexus.lovable.app/" />
+    <title>APEX HUB</title>
+    <meta name="description" content="Sistema para gestão industrial" />
+    <meta name="author" content="ATOM Corp." />
 
-    <meta property="og:title" content="Nexus - Personal Blog | Fashion, Technology & Lifestyle" />
-    <meta property="og:description" content="Explore the latest in fashion trends, technology insights, business strategies, and lifestyle inspiration on Nexus personal blog." />
+    <meta property="og:title" content="APEX HUB" />
+    <meta property="og:description" content="Sistema ERP para gestão industrial" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/8jp6KAG7qJZgRp4lIs04ZYXqlhL2/social-images/social-1758609028260-download.jpg">
-    <meta property="og:url" content="https://nexus.lovable.app/" />
+    <meta property="og:image" content="https://res.cloudinary.com/diomtgcvb/image/upload/v1768956525/APEX_LOGO_ssi5g2.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@nexus_blog" />
-    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/8jp6KAG7qJZgRp4lIs04ZYXqlhL2/social-images/social-1758609028260-download.jpg">
-
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Blog",
-      "name": "Nexus Personal Blog",
-      "description": "Explore the latest in fashion trends, technology insights, business strategies, and lifestyle inspiration",
-      "url": "https://nexus.lovable.app/",
-      "publisher": {
-        "@type": "Organization",
-        "name": "Nexus Blog"
-      },
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "https://nexus.lovable.app/"
+    <meta name="twitter:site" content="@atomcorp" />
+    <meta name="twitter:image" content="https://res.cloudinary.com/diomtgcvb/image/upload/v1768956525/APEX_LOGO_ssi5g2.png" />
+    
+    <link rel="icon" type="image/png" href="https://res.cloudinary.com/diomtgcvb/image/upload/v1768956525/APEX_LOGO_ssi5g2.png">
+    <link rel="apple-touch-icon" href="https://res.cloudinary.com/diomtgcvb/image/upload/v1768956525/APEX_LOGO_ssi5g2.png">
+    <link rel="shortcut icon" href="https://res.cloudinary.com/diomtgcvb/image/upload/v1768956525/APEX_LOGO_ssi5g2.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+      /* Aplicar Poppins como fonte principal em todo o site */
+      body, html {
+        font-family: 'Poppins', sans-serif;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow-x: hidden;
       }
-    }
-    </script>
+      
+      /* Reset de transformações de escala */
+      .login-container,
+      .dashboard-container,
+      .sidebar,
+      .auth-container,
+      [data-component="login"],
+      [data-component="dashboard"],
+      [data-component="sidebar"] {
+        transform: none !important;
+        width: auto !important;
+      }
+      
+      /* Ajustar contêineres pai */
+      .login-wrapper,
+      .dashboard-wrapper,
+      .sidebar-wrapper,
+      .auth-wrapper {
+        overflow: visible;
+      }
+      
+      /* Manter a classe font-roboto para compatibilidade, mas usar Poppins */
+      .font-roboto, .font-roboto * {
+        font-family: 'Poppins', sans-serif;
+        letter-spacing: 0.02em;
+        font-size: 1rem;
+      }
+      
+      /* Ajustes para pesos de fonte específicos do Firebase */
+      .font-roboto .text-sm {
+        font-weight: 600;
+      }
+      
+      .font-roboto .text-xs {
+        font-weight: 600;
+      }
+      
+      .font-roboto .font-medium {
+        font-weight: 600;
+      }
+      
+      /* Ajustes para melhorar a visibilidade no tema claro */
+      :root:not(.dark) .font-roboto {
+        color: #333333;
+      }
+      
+      :root:not(.dark) .text-gray-300 {
+        color: #333333 !important;
+      }
+      
+      :root:not(.dark) .text-gray-400 {
+        color: #555555 !important;
+      }
+      
+      :root:not(.dark) .text-gray-500 {
+        color: #666666 !important;
+      }
+      
+      /* Ajustes para os items do menu no tema claro */
+      :root:not(.dark) .hover\:bg-\[\#2c384a\]:hover {
+        background-color: #e0e0e0 !important;
+      }
+      
+      :root:not(.dark) .bg-\[\#2c384a\] {
+        background-color: #f0f0f0 !important;
+      }
+      
+      :root:not(.dark) .bg-\[\#1c2834\] {
+        background-color: #ffffff !important;
+      }
+      
+      :root:not(.dark) .border-\[\#3e4a5e\] {
+        border-color: #dddddd !important;
+      }
+
+      /* Garantir que o root ocupe toda a tela */
+      #root {
+        width: 100%;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
   </head>
 
   <body>
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-primary-foreground px-4 py-2 rounded z-50">Skip to main content</a>
     <div id="root"></div>
+    <script>
+      // Workaround for some preview/proxy environments where Vite's WS token injection can fail,
+      // causing /@vite/client to crash with "__WS_TOKEN__ is not defined".
+      // This keeps the app loading even if HMR token checks can't run.
+      // eslint-disable-next-line no-var
+      if (typeof __WS_TOKEN__ === "undefined") var __WS_TOKEN__ = "";
+    </script>
+    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

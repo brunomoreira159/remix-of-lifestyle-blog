@@ -9,21 +9,21 @@ const Terms = () => {
       <main id="main-content" className="container-blog py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-8">
-            Terms of Service
+            Termos de Serviço
           </h1>
           
           <div className="prose prose-lg max-w-none text-muted-foreground space-y-8">
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">1. Aceitação dos Termos</h2>
               <p>
-                By accessing and using the Nexus Blog website, you accept and agree to be bound by the terms and provision of this agreement. These Terms of Service govern your use of our website and services.
+                Ao acessar e usar o sistema APEX HUB, você aceita e concorda em estar vinculado aos termos e disposições deste acordo. Estes Termos de Serviço regem o uso do nosso sistema e serviços.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">2. Use License</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">2. Licença de Uso</h2>
               <p>
-                Permission is granted to temporarily download one copy of the materials on Nexus Blog's website for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
+                É concedida permissão para uso do sistema APEX HUB conforme os termos da sua licença. Esta é a concessão de uma licença, não uma transferência de título, e sob esta licença você não pode:
               </p>
               <ul className="list-disc pl-6 mt-4 space-y-2">
                 <li>modify or copy the materials</li>
@@ -47,30 +47,30 @@ const Terms = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">4. Disclaimer</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">4. Isenção de Responsabilidade</h2>
               <p>
-                The materials on Nexus Blog's website are provided on an 'as is' basis. Nexus Blog makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.
+                Os materiais do sistema APEX HUB são fornecidos "como estão". A ATOM Corp. não oferece garantias, expressas ou implícitas, e por meio deste instrumento renuncia e nega todas as outras garantias, incluindo, sem limitação, garantias implícitas ou condições de comercialização, adequação a um propósito específico ou não violação de propriedade intelectual.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">5. Limitations</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">5. Limitações</h2>
               <p>
-                In no event shall Nexus Blog or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on Nexus Blog's website, even if Nexus Blog or its authorized representative has been notified orally or in writing of the possibility of such damage.
+                Em nenhum caso a ATOM Corp. ou seus fornecedores serão responsáveis por quaisquer danos (incluindo, sem limitação, danos por perda de dados ou lucro, ou devido à interrupção dos negócios) decorrentes do uso ou incapacidade de usar o sistema APEX HUB.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">6. Revisions</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">6. Revisões</h2>
               <p>
-                Nexus Blog may revise these terms of service at any time without notice. By using this website, you are agreeing to be bound by the then-current version of these terms of service.
+                A ATOM Corp. pode revisar estes termos de serviço a qualquer momento sem aviso prévio. Ao usar este sistema, você concorda em estar vinculado à versão atual destes termos de serviço.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-4">7. Contact Information</h2>
+              <h2 className="text-2xl font-semibold text-foreground mb-4">7. Informações de Contato</h2>
               <p>
-                If you have any questions about these Terms of Service, please contact us through our website or email us at legal@nexusblog.com.
+                Se você tiver dúvidas sobre estes Termos de Serviço, entre em contato conosco através do nosso sistema ou envie um e-mail para contato@atomcorp.com.br.
               </p>
             </section>
 

@@ -1,33 +1,22 @@
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import { DefaultFeaturedArticle } from '@/components/FeaturedArticle';
-import EditorsPick from '@/components/EditorsPick';
-import TrendingBlock from '@/components/TrendingBlock';
-import MasonryBlock from '@/components/MasonryBlock';
-import BlogGrid from '@/components/BlogGrid';
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main id="main-content">
-        <DefaultFeaturedArticle />
-        <section aria-labelledby="editors-pick-heading">
-          <EditorsPick />
-        </section>
-        <section aria-labelledby="trending-heading">
-          <TrendingBlock />
-        </section>
-        <section aria-labelledby="masonry-heading">
-          <MasonryBlock />
-        </section>
-        <section aria-labelledby="all-posts-heading">
-          <BlogGrid />
-        </section>
-      </main>
-      <Footer />
-    </div>
-  );
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    // If user is logged in, redirect to dashboard
+    // Otherwise, redirect to login page
+    if (user) {
+      navigate("/dashboard");
+    } else {
+      navigate("/");
+    }
+  }, [navigate, user]);
+
+  return null;
 };
 
 export default Index;
