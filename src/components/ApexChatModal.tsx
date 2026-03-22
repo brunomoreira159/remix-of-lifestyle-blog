@@ -31,6 +31,7 @@ interface ApexChatModalProps {
   onClose: () => void;
 }
 
+// Interfaces para todas as coleções
 interface ProdutoChatData {
   id: string;
   codigo_estoque: string;
@@ -47,55 +48,120 @@ interface ProdutoChatData {
   data_vencimento: string;
   fornecedor_nome: string | null;
   fornecedor_cnpj: string | null;
+  fornecedor_id: string | null;
   ativo: string;
 }
 
-interface ProdutosEndpointResult {
-  isProdutosRequest: boolean;
+interface FornecedorChatData {
+  id: string;
+  razaoSocial: string;
+  cnpj: string;
+  endereco: {
+    rua: string;
+    numero: string;
+    complemento: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+  };
+  telefone: string;
+  email: string;
+  pessoaContato: string;
+  condicoesPagamento: string;
+  prazoEntrega: string;
+}
+
+interface EquipamentoChatData {
+  id: string;
+  equipamento: string;
+  patrimonio: string;
+  setor: string;
+  tag: string;
+  status: string;
+  descricao: string;
+}
+
+interface ManutentorChatData {
+  id: string;
+  nome: string;
+  cargo: string;
+  setor: string;
+  email: string;
+  telefone: string;
+  status: string;
+}
+
+interface ManualChatData {
+  id: string;
+  titulo: string;
+  subtitulo: string;
+  ativo: boolean;
+  dataCriacao: string;
+}
+
+interface TarefaManutencaoChatData {
+  id: string;
+  titulo: string;
+  descricao: string;
+  equipamento: string;
+  setor: string;
+  frequencia: string;
+  status: string;
+  prioridade: string;
+  manutentor: string;
+  dataHoraAgendada: string;
+}
+
+interface OrdemServicoChatData {
+  id: string;
+  titulo: string;
+  descricao: string;
+  equipamento: string;
+  setor: string;
+  status: string;
+  prioridade: string;
+  dataAbertura: string;
+  dataConclusao: string;
+}
+
+interface UnidadeChatData {
+  id: string;
+  nome: string;
+  codigo: string;
+  endereco: string;
+  responsavel: string;
+  telefone: string;
+}
+
+interface SetorChatData {
+  id: string;
+  nome: string;
+  descricao: string;
+  responsavel: string;
+  unidade: string;
+}
+
+interface CentroCustoChatData {
+  id: string;
+  nome: string;
+  codigo: string;
+  descricao: string;
+}
+
+interface DatabaseContextResult {
+  hasRelevantData: boolean;
   context: string;
   fallbackAnswer: string;
 }
 
 const STOP_WORDS = new Set([
-  "quais",
-  "qual",
-  "quero",
-  "mostrar",
-  "mostre",
-  "listar",
-  "liste",
-  "tem",
-  "tenho",
-  "produto",
-  "produtos",
-  "item",
-  "itens",
-  "do",
-  "da",
-  "de",
-  "dos",
-  "das",
-  "no",
-  "na",
-  "nos",
-  "nas",
-  "com",
-  "sem",
-  "por",
-  "para",
-  "que",
-  "em",
-  "os",
-  "as",
-  "um",
-  "uma",
-  "mais",
-  "menos",
-  "me",
-  "traga",
-  "busque",
-  "buscar",
-  "sobre"
+  "quais", "qual", "quero", "mostrar", "mostre", "listar", "liste", "tem", "tenho",
+  "produto", "produtos", "item", "itens", "do", "da", "de", "dos", "das", "no", "na",
+  "nos", "nas", "com", "sem", "por", "para", "que", "em", "os", "as", "um", "uma",
+  "mais", "menos", "me", "traga", "busque", "buscar", "sobre", "onde", "como", "quando",
+  "maquina", "maquinas", "equipamento", "equipamentos", "fornecedor", "fornecedores",
+  "manutentor", "manutentores", "manual", "manuais", "tarefa", "tarefas", "ordem", "ordens"
 ]);
 
 const normalizeText = (text: string) =>
@@ -108,25 +174,68 @@ const normalizeText = (text: string) =>
 const formatCurrencyBRL = (value: number) =>
   Number.isFinite(value) ? value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ 0,00";
 
-const isLikelyProdutosRequest = (message: string) => {
+// Detectar qual coleção a pergunta está relacionada
+const detectRelevantCollections = (message: string): string[] => {
   const normalized = normalizeText(message);
-  const keywords = [
-    "produto",
-    "estoque",
-    "deposito",
-    "fornecedor",
-    "preco",
-    "valor",
-    "prateleira",
-    "vencimento",
-    "codigo",
-    "material",
-    "quantidade",
-    "unidade",
-    "barato",
-    "caro"
-  ];
-  return keywords.some((keyword) => normalized.includes(keyword)) || /^(tem|quais|qual|liste|listar|mostre|mostrar)\b/.test(normalized);
+  const collections: string[] = [];
+
+  // Produtos
+  if (/(produto|estoque|deposito|prateleira|vencimento|codigo|material|quantidade|barato|caro|item|itens|preco|valor)/.test(normalized)) {
+    collections.push("produtos");
+  }
+
+  // Fornecedores
+  if (/(fornecedor|cnpj|razao social|pagamento|prazo entrega|contato|fornece)/.test(normalized)) {
+    collections.push("fornecedores");
+  }
+
+  // Equipamentos/Máquinas
+  if (/(maquina|equipamento|patrimonio|tag|setor)/.test(normalized) && !/(manutentor)/.test(normalized)) {
+    collections.push("equipamentos");
+  }
+
+  // Manutentores
+  if (/(manutentor|tecnico|tecnicos|manutencao|quem faz|responsavel)/.test(normalized)) {
+    collections.push("manutentores");
+  }
+
+  // Manuais
+  if (/(manual|manuais|instrucao|instrucoes|documento)/.test(normalized)) {
+    collections.push("manuais");
+  }
+
+  // Tarefas de Manutenção
+  if (/(tarefa|tarefas|preventiva|agendada|agendamento|frequencia)/.test(normalized)) {
+    collections.push("tarefas_manutencao");
+  }
+
+  // Ordens de Serviço
+  if (/(ordem|ordens|os|servico|servicos|aberta|pendente|concluida)/.test(normalized)) {
+    collections.push("ordens_servicos");
+  }
+
+  // Unidades
+  if (/(unidade|unidades|filial|filiais|loja|lojas)/.test(normalized)) {
+    collections.push("unidades");
+  }
+
+  // Setores
+  if (/(setor|setores|departamento|area)/.test(normalized) && !/(equipamento|maquina)/.test(normalized)) {
+    collections.push("setores");
+  }
+
+  // Centro de Custo
+  if (/(centro de custo|centro custo|custo|centros)/.test(normalized)) {
+    collections.push("centros_de_custo");
+  }
+
+  // Se não detectou nenhuma coleção específica mas parece uma pergunta sobre dados
+  if (collections.length === 0 && /(quantos|quantas|lista|listar|mostre|mostrar|tem|temos|existe|buscar|encontrar|relatorio|resumo|total)/.test(normalized)) {
+    // Buscar em todas as coleções principais
+    collections.push("produtos", "fornecedores", "equipamentos");
+  }
+
+  return collections;
 };
 
 const extractSearchTerms = (message: string) => {
@@ -137,13 +246,10 @@ const extractSearchTerms = (message: string) => {
     .slice(0, 5);
 };
 
-const localProdutosEndpoint = async (message: string): Promise<ProdutosEndpointResult> => {
-  if (!isLikelyProdutosRequest(message)) {
-    return { isProdutosRequest: false, context: "", fallbackAnswer: "" };
-  }
-
+// Buscar dados de produtos
+const fetchProdutosContext = async (message: string): Promise<string> => {
   try {
-    const produtosSnapshot = await getDocs(query(collection(db, "produtos"), orderBy("nome"), limit(300)));
+    const produtosSnapshot = await getDocs(query(collection(db, "produtos"), orderBy("nome"), limit(500)));
     const produtos = produtosSnapshot.docs.map((docRef) => {
       const data = docRef.data();
       return {
@@ -162,6 +268,7 @@ const localProdutosEndpoint = async (message: string): Promise<ProdutosEndpointR
         data_vencimento: data.data_vencimento || "",
         fornecedor_nome: data.fornecedor_nome || null,
         fornecedor_cnpj: data.fornecedor_cnpj || null,
+        fornecedor_id: data.fornecedor_id || null,
         ativo: data.ativo || "sim",
       } as ProdutoChatData;
     });
@@ -169,83 +276,507 @@ const localProdutosEndpoint = async (message: string): Promise<ProdutosEndpointR
     const normalizedMessage = normalizeText(message);
     let filtered = [...produtos];
 
+    // Filtros inteligentes
     if (normalizedMessage.includes("inativo")) {
-      filtered = filtered.filter((produto) => normalizeText(produto.ativo) === "nao");
-    } else {
-      filtered = filtered.filter((produto) => normalizeText(produto.ativo) !== "nao");
+      filtered = filtered.filter((p) => normalizeText(p.ativo) === "nao" || normalizeText(p.ativo) === "não");
+    } else if (!normalizedMessage.includes("todos") && !normalizedMessage.includes("todas")) {
+      filtered = filtered.filter((p) => normalizeText(p.ativo) !== "nao" && normalizeText(p.ativo) !== "não");
     }
 
     if (/(zerado|sem estoque|esgotado|quantidade zero)/.test(normalizedMessage)) {
-      filtered = filtered.filter((produto) => produto.quantidade <= 0);
+      filtered = filtered.filter((p) => p.quantidade <= 0);
     } else if (/(baixo estoque|estoque baixo|abaixo do minimo|repor|faltando)/.test(normalizedMessage)) {
-      filtered = filtered.filter((produto) => produto.quantidade < produto.quantidade_minima);
+      filtered = filtered.filter((p) => p.quantidade < p.quantidade_minima);
     }
 
-    const depositoMatch = normalizedMessage.match(/deposito\s+([a-z0-9\s-]+)/);
-    if (depositoMatch?.[1]) {
-      const depositoBusca = depositoMatch[1].trim();
-      filtered = filtered.filter((produto) => normalizeText(produto.deposito).includes(depositoBusca));
-    }
-
-    const fornecedorMatch = normalizedMessage.match(/fornecedor\s+([a-z0-9\s-]+)/);
-    if (fornecedorMatch?.[1]) {
-      const fornecedorBusca = fornecedorMatch[1].trim();
-      filtered = filtered.filter((produto) => normalizeText(produto.fornecedor_nome || "").includes(fornecedorBusca));
-    }
-
+    // Busca por termos específicos
     const searchTerms = extractSearchTerms(message);
     if (searchTerms.length > 0) {
       filtered = filtered.filter((produto) => {
         const base = normalizeText(
-          `${produto.nome} ${produto.codigo_estoque} ${produto.codigo_material} ${produto.detalhes} ${produto.fornecedor_nome || ""} ${produto.fornecedor_cnpj || ""} ${produto.deposito} ${produto.prateleira}`
+          `${produto.nome} ${produto.codigo_estoque} ${produto.codigo_material} ${produto.detalhes} ${produto.fornecedor_nome || ""} ${produto.fornecedor_cnpj || ""} ${produto.deposito} ${produto.prateleira} ${produto.unidade}`
         );
         return searchTerms.some((term) => base.includes(term));
       });
     }
 
-    if (/(mais barato|mais baratos|menor preco|preco mais baixo|barato)/.test(normalizedMessage)) {
+    // Ordenação
+    if (/(mais barato|menor preco)/.test(normalizedMessage)) {
       filtered.sort((a, b) => a.valor_unitario - b.valor_unitario);
-    } else if (/(mais caro|mais caros|maior preco|preco mais alto|caro)/.test(normalizedMessage)) {
+    } else if (/(mais caro|maior preco)/.test(normalizedMessage)) {
       filtered.sort((a, b) => b.valor_unitario - a.valor_unitario);
     }
 
-    const totalEncontrado = filtered.length;
-    const topProdutos = filtered.slice(0, 12);
+    const topProdutos = filtered.slice(0, 20);
+    const totalProdutos = produtos.length;
+    const totalFiltrado = filtered.length;
 
     const contextoProdutos = topProdutos
-      .map(
-        (produto, index) =>
-          `${index + 1}. nome=${produto.nome}; codigo_estoque=${produto.codigo_estoque}; codigo_material=${produto.codigo_material}; quantidade=${produto.quantidade}; quantidade_minima=${produto.quantidade_minima}; valor_unitario=${formatCurrencyBRL(produto.valor_unitario)}; unidade_de_medida=${produto.unidade_de_medida}; deposito=${produto.deposito}; prateleira=${produto.prateleira}; unidade=${produto.unidade}; fornecedor_nome=${produto.fornecedor_nome || "não informado"}; fornecedor_cnpj=${produto.fornecedor_cnpj || "não informado"}; data_vencimento=${produto.data_vencimento || "não informado"}; ativo=${produto.ativo}; detalhes=${produto.detalhes || "não informado"}`
+      .map((p, i) =>
+        `${i + 1}. Nome: ${p.nome} | Código Estoque: ${p.codigo_estoque} | Código Material: ${p.codigo_material} | Quantidade: ${p.quantidade} | Mínimo: ${p.quantidade_minima} | Valor: ${formatCurrencyBRL(p.valor_unitario)} | Unidade Medida: ${p.unidade_de_medida} | Depósito: ${p.deposito} | Prateleira: ${p.prateleira} | Unidade: ${p.unidade} | Fornecedor: ${p.fornecedor_nome || "não informado"} | CNPJ Fornecedor: ${p.fornecedor_cnpj || "não informado"} | Vencimento: ${p.data_vencimento || "não informado"} | Ativo: ${p.ativo} | Detalhes: ${p.detalhes || "não informado"}`
       )
       .join("\n");
 
-    const contexto = totalEncontrado > 0
-      ? `Consulta de produtos no Firestore:\n- Pergunta do usuário: ${message}\n- Total encontrado: ${totalEncontrado}\n- Registros enviados para resposta: ${topProdutos.length}\n- Campos disponíveis: id, codigo_estoque, codigo_material, nome, quantidade, quantidade_minima, valor_unitario, unidade_de_medida, deposito, prateleira, unidade, detalhes, data_vencimento, fornecedor_nome, fornecedor_cnpj, ativo\n- Dados:\n${contextoProdutos}`
-      : `Consulta de produtos no Firestore:\n- Pergunta do usuário: ${message}\n- Total encontrado: 0\n- Campos disponíveis: id, codigo_estoque, codigo_material, nome, quantidade, quantidade_minima, valor_unitario, unidade_de_medida, deposito, prateleira, unidade, detalhes, data_vencimento, fornecedor_nome, fornecedor_cnpj, ativo\n- Não há produtos correspondentes aos filtros da pergunta.`;
-
-    const fallbackAnswer = totalEncontrado > 0
-      ? `Encontrei ${totalEncontrado} produto(s). ${topProdutos
-          .slice(0, 5)
-          .map(
-            (produto) =>
-              `${produto.nome} (estoque: ${produto.quantidade}, mínimo: ${produto.quantidade_minima}, valor: ${formatCurrencyBRL(produto.valor_unitario)}, depósito: ${produto.deposito || "não informado"})`
-          )
-          .join(" | ")}`
-      : "Não encontrei produtos com os critérios informados. Tente buscar por nome, código, depósito ou fornecedor.";
-
-    return {
-      isProdutosRequest: true,
-      context: contexto,
-      fallbackAnswer,
-    };
+    return `\n\n=== COLEÇÃO PRODUTOS ===\nTotal de produtos no sistema: ${totalProdutos}\nProdutos encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topProdutos.length} registros:\n${contextoProdutos}`;
   } catch (error) {
     console.error("Erro ao buscar produtos:", error);
+    return "\n\n=== COLEÇÃO PRODUTOS ===\nErro ao acessar dados de produtos.";
+  }
+};
+
+// Buscar dados de fornecedores
+const fetchFornecedoresContext = async (message: string): Promise<string> => {
+  try {
+    const fornecedoresSnapshot = await getDocs(collection(db, "fornecedores"));
+    const fornecedores = fornecedoresSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        razaoSocial: data.razaoSocial || "",
+        cnpj: data.cnpj || "",
+        endereco: data.endereco || { rua: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "", cep: "" },
+        telefone: data.telefone || "",
+        email: data.email || "",
+        pessoaContato: data.pessoaContato || "",
+        condicoesPagamento: data.condicoesPagamento || "",
+        prazoEntrega: data.prazoEntrega || "",
+      } as FornecedorChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...fornecedores];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((f) => {
+        const base = normalizeText(
+          `${f.razaoSocial} ${f.cnpj} ${f.email} ${f.telefone} ${f.pessoaContato} ${f.endereco.cidade} ${f.endereco.estado}`
+        );
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topFornecedores = filtered.slice(0, 20);
+    const totalFornecedores = fornecedores.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoFornecedores = topFornecedores
+      .map((f, i) =>
+        `${i + 1}. Razão Social: ${f.razaoSocial} | CNPJ: ${f.cnpj} | Telefone: ${f.telefone} | Email: ${f.email} | Contato: ${f.pessoaContato} | Endereço: ${f.endereco.rua}, ${f.endereco.numero}, ${f.endereco.bairro}, ${f.endereco.cidade}/${f.endereco.estado} - CEP: ${f.endereco.cep} | Condições de Pagamento: ${f.condicoesPagamento} | Prazo de Entrega: ${f.prazoEntrega}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO FORNECEDORES ===\nTotal de fornecedores no sistema: ${totalFornecedores}\nFornecedores encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topFornecedores.length} registros:\n${contextoFornecedores}`;
+  } catch (error) {
+    console.error("Erro ao buscar fornecedores:", error);
+    return "\n\n=== COLEÇÃO FORNECEDORES ===\nErro ao acessar dados de fornecedores.";
+  }
+};
+
+// Buscar dados de equipamentos/máquinas
+const fetchEquipamentosContext = async (message: string): Promise<string> => {
+  try {
+    const equipamentosSnapshot = await getDocs(collection(db, "equipamentos"));
+    const equipamentos = equipamentosSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        equipamento: data.equipamento || "",
+        patrimonio: data.patrimonio || "",
+        setor: data.setor || "",
+        tag: data.tag || "",
+        status: data.status || "Ativa",
+        descricao: data.descricao || "",
+      } as EquipamentoChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...equipamentos];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((e) => {
+        const base = normalizeText(`${e.equipamento} ${e.patrimonio} ${e.setor} ${e.tag} ${e.descricao}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topEquipamentos = filtered.slice(0, 20);
+    const totalEquipamentos = equipamentos.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoEquipamentos = topEquipamentos
+      .map((e, i) =>
+        `${i + 1}. Equipamento: ${e.equipamento} | Patrimônio: ${e.patrimonio} | Setor: ${e.setor} | Tag: ${e.tag} | Status: ${e.status} | Descrição: ${e.descricao || "não informado"}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO EQUIPAMENTOS/MÁQUINAS ===\nTotal de equipamentos no sistema: ${totalEquipamentos}\nEquipamentos encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topEquipamentos.length} registros:\n${contextoEquipamentos}`;
+  } catch (error) {
+    console.error("Erro ao buscar equipamentos:", error);
+    return "\n\n=== COLEÇÃO EQUIPAMENTOS ===\nErro ao acessar dados de equipamentos.";
+  }
+};
+
+// Buscar dados de manutentores
+const fetchManutentoresContext = async (message: string): Promise<string> => {
+  try {
+    const manutentoresSnapshot = await getDocs(collection(db, "manutentores"));
+    const manutentores = manutentoresSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        nome: data.nome || "",
+        cargo: data.cargo || "",
+        setor: data.setor || "",
+        email: data.email || "",
+        telefone: data.telefone || "",
+        status: data.status || data.ativo ? "Ativo" : "Inativo",
+      } as ManutentorChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...manutentores];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((m) => {
+        const base = normalizeText(`${m.nome} ${m.cargo} ${m.setor} ${m.email}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topManutentores = filtered.slice(0, 20);
+    const totalManutentores = manutentores.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoManutentores = topManutentores
+      .map((m, i) =>
+        `${i + 1}. Nome: ${m.nome} | Cargo: ${m.cargo} | Setor: ${m.setor} | Email: ${m.email} | Telefone: ${m.telefone} | Status: ${m.status}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO MANUTENTORES ===\nTotal de manutentores no sistema: ${totalManutentores}\nManutentores encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topManutentores.length} registros:\n${contextoManutentores}`;
+  } catch (error) {
+    console.error("Erro ao buscar manutentores:", error);
+    return "\n\n=== COLEÇÃO MANUTENTORES ===\nErro ao acessar dados de manutentores.";
+  }
+};
+
+// Buscar dados de manuais
+const fetchManuaisContext = async (message: string): Promise<string> => {
+  try {
+    const manuaisSnapshot = await getDocs(collection(db, "pdf_manuais"));
+    const manuais = manuaisSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        titulo: data.titulo || "",
+        subtitulo: data.subtitulo || "",
+        ativo: data.ativo !== false,
+        dataCriacao: data.dataCriacao || "",
+      } as ManualChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...manuais];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((m) => {
+        const base = normalizeText(`${m.titulo} ${m.subtitulo}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topManuais = filtered.slice(0, 20);
+    const totalManuais = manuais.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoManuais = topManuais
+      .map((m, i) =>
+        `${i + 1}. Título: ${m.titulo} | Subtítulo: ${m.subtitulo} | Ativo: ${m.ativo ? "Sim" : "Não"} | Data Criação: ${m.dataCriacao}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO MANUAIS ===\nTotal de manuais no sistema: ${totalManuais}\nManuais encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topManuais.length} registros:\n${contextoManuais}`;
+  } catch (error) {
+    console.error("Erro ao buscar manuais:", error);
+    return "\n\n=== COLEÇÃO MANUAIS ===\nErro ao acessar dados de manuais.";
+  }
+};
+
+// Buscar dados de tarefas de manutenção
+const fetchTarefasManutencaoContext = async (message: string): Promise<string> => {
+  try {
+    const tarefasSnapshot = await getDocs(collection(db, "tarefas_manutencao"));
+    const tarefas = tarefasSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        titulo: data.titulo || data.descricao || "",
+        descricao: data.descricao || "",
+        equipamento: data.equipamento || "",
+        setor: data.setor || "",
+        frequencia: data.frequencia || "",
+        status: data.status || "",
+        prioridade: data.prioridade || "",
+        manutentor: data.manutentor || data.manutentorNome || "",
+        dataHoraAgendada: data.dataHoraAgendada || "",
+      } as TarefaManutencaoChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...tarefas];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((t) => {
+        const base = normalizeText(`${t.titulo} ${t.descricao} ${t.equipamento} ${t.setor} ${t.manutentor}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topTarefas = filtered.slice(0, 20);
+    const totalTarefas = tarefas.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoTarefas = topTarefas
+      .map((t, i) =>
+        `${i + 1}. Título: ${t.titulo} | Equipamento: ${t.equipamento} | Setor: ${t.setor} | Frequência: ${t.frequencia} | Status: ${t.status} | Prioridade: ${t.prioridade} | Manutentor: ${t.manutentor} | Agendada: ${t.dataHoraAgendada}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO TAREFAS DE MANUTENÇÃO ===\nTotal de tarefas no sistema: ${totalTarefas}\nTarefas encontradas na busca: ${totalFiltrado}\nExibindo as primeiras ${topTarefas.length} registros:\n${contextoTarefas}`;
+  } catch (error) {
+    console.error("Erro ao buscar tarefas:", error);
+    return "\n\n=== COLEÇÃO TAREFAS DE MANUTENÇÃO ===\nErro ao acessar dados de tarefas.";
+  }
+};
+
+// Buscar dados de ordens de serviço
+const fetchOrdensServicoContext = async (message: string): Promise<string> => {
+  try {
+    const ordensSnapshot = await getDocs(collection(db, "ordens_servicos"));
+    const ordens = ordensSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        titulo: data.titulo || data.descricao || "",
+        descricao: data.descricao || "",
+        equipamento: data.equipamento || "",
+        setor: data.setor || "",
+        status: data.status || "",
+        prioridade: data.prioridade || "",
+        dataAbertura: data.dataAbertura || data.criadoEm || "",
+        dataConclusao: data.dataConclusao || "",
+      } as OrdemServicoChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...ordens];
+
+    const normalizedMessage = normalizeText(message);
+    if (normalizedMessage.includes("aberta") || normalizedMessage.includes("pendente")) {
+      filtered = filtered.filter((o) => normalizeText(o.status).includes("aberta") || normalizeText(o.status).includes("pendente"));
+    } else if (normalizedMessage.includes("concluida") || normalizedMessage.includes("finalizada")) {
+      filtered = filtered.filter((o) => normalizeText(o.status).includes("conclu") || normalizeText(o.status).includes("finaliz"));
+    }
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((o) => {
+        const base = normalizeText(`${o.titulo} ${o.descricao} ${o.equipamento} ${o.setor}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const topOrdens = filtered.slice(0, 20);
+    const totalOrdens = ordens.length;
+    const totalFiltrado = filtered.length;
+
+    const contextoOrdens = topOrdens
+      .map((o, i) =>
+        `${i + 1}. Título: ${o.titulo} | Equipamento: ${o.equipamento} | Setor: ${o.setor} | Status: ${o.status} | Prioridade: ${o.prioridade} | Abertura: ${o.dataAbertura} | Conclusão: ${o.dataConclusao || "não concluída"}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO ORDENS DE SERVIÇO ===\nTotal de ordens no sistema: ${totalOrdens}\nOrdens encontradas na busca: ${totalFiltrado}\nExibindo as primeiras ${topOrdens.length} registros:\n${contextoOrdens}`;
+  } catch (error) {
+    console.error("Erro ao buscar ordens:", error);
+    return "\n\n=== COLEÇÃO ORDENS DE SERVIÇO ===\nErro ao acessar dados de ordens de serviço.";
+  }
+};
+
+// Buscar dados de unidades
+const fetchUnidadesContext = async (message: string): Promise<string> => {
+  try {
+    const unidadesSnapshot = await getDocs(collection(db, "unidades"));
+    const unidades = unidadesSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        nome: data.nome || "",
+        codigo: data.codigo || "",
+        endereco: data.endereco || "",
+        responsavel: data.responsavel || "",
+        telefone: data.telefone || "",
+      } as UnidadeChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...unidades];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((u) => {
+        const base = normalizeText(`${u.nome} ${u.codigo} ${u.endereco} ${u.responsavel}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const contextoUnidades = filtered
+      .map((u, i) =>
+        `${i + 1}. Nome: ${u.nome} | Código: ${u.codigo} | Endereço: ${u.endereco} | Responsável: ${u.responsavel} | Telefone: ${u.telefone}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO UNIDADES ===\nTotal de unidades no sistema: ${unidades.length}\nUnidades encontradas: ${filtered.length}\n${contextoUnidades}`;
+  } catch (error) {
+    console.error("Erro ao buscar unidades:", error);
+    return "\n\n=== COLEÇÃO UNIDADES ===\nErro ao acessar dados de unidades.";
+  }
+};
+
+// Buscar dados de setores
+const fetchSetoresContext = async (message: string): Promise<string> => {
+  try {
+    const setoresSnapshot = await getDocs(collection(db, "setores"));
+    const setores = setoresSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        nome: data.nome || "",
+        descricao: data.descricao || "",
+        responsavel: data.responsavel || "",
+        unidade: data.unidade || "",
+      } as SetorChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...setores];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((s) => {
+        const base = normalizeText(`${s.nome} ${s.descricao} ${s.responsavel} ${s.unidade}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const contextoSetores = filtered
+      .map((s, i) =>
+        `${i + 1}. Nome: ${s.nome} | Descrição: ${s.descricao} | Responsável: ${s.responsavel} | Unidade: ${s.unidade}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO SETORES ===\nTotal de setores no sistema: ${setores.length}\nSetores encontrados: ${filtered.length}\n${contextoSetores}`;
+  } catch (error) {
+    console.error("Erro ao buscar setores:", error);
+    return "\n\n=== COLEÇÃO SETORES ===\nErro ao acessar dados de setores.";
+  }
+};
+
+// Buscar dados de centros de custo
+const fetchCentrosCustoContext = async (message: string): Promise<string> => {
+  try {
+    const centrosSnapshot = await getDocs(collection(db, "centros_de_custo"));
+    const centros = centrosSnapshot.docs.map((docRef) => {
+      const data = docRef.data();
+      return {
+        id: docRef.id,
+        nome: data.nome || "",
+        codigo: data.codigo || "",
+        descricao: data.descricao || "",
+      } as CentroCustoChatData;
+    });
+
+    const searchTerms = extractSearchTerms(message);
+    let filtered = [...centros];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((c) => {
+        const base = normalizeText(`${c.nome} ${c.codigo} ${c.descricao}`);
+        return searchTerms.some((term) => base.includes(term));
+      });
+    }
+
+    const contextoCentros = filtered
+      .map((c, i) =>
+        `${i + 1}. Nome: ${c.nome} | Código: ${c.codigo} | Descrição: ${c.descricao}`
+      )
+      .join("\n");
+
+    return `\n\n=== COLEÇÃO CENTROS DE CUSTO ===\nTotal de centros de custo: ${centros.length}\nCentros encontrados: ${filtered.length}\n${contextoCentros}`;
+  } catch (error) {
+    console.error("Erro ao buscar centros de custo:", error);
+    return "\n\n=== COLEÇÃO CENTROS DE CUSTO ===\nErro ao acessar dados de centros de custo.";
+  }
+};
+
+// Função principal que busca contexto de todas as coleções relevantes
+const fetchDatabaseContext = async (message: string): Promise<DatabaseContextResult> => {
+  const collections = detectRelevantCollections(message);
+  
+  if (collections.length === 0) {
     return {
-      isProdutosRequest: false,
+      hasRelevantData: false,
       context: "",
-      fallbackAnswer: "Desculpe, não foi possível buscar os produtos no momento. Tente novamente mais tarde.",
+      fallbackAnswer: "",
     };
   }
+
+  let fullContext = "\n\n=== DADOS DO SISTEMA APEX HUB ===\nAbaixo estão os dados das coleções relevantes para responder à pergunta do usuário:\n";
+  
+  const contextPromises: Promise<string>[] = [];
+
+  for (const col of collections) {
+    switch (col) {
+      case "produtos":
+        contextPromises.push(fetchProdutosContext(message));
+        break;
+      case "fornecedores":
+        contextPromises.push(fetchFornecedoresContext(message));
+        break;
+      case "equipamentos":
+        contextPromises.push(fetchEquipamentosContext(message));
+        break;
+      case "manutentores":
+        contextPromises.push(fetchManutentoresContext(message));
+        break;
+      case "manuais":
+        contextPromises.push(fetchManuaisContext(message));
+        break;
+      case "tarefas_manutencao":
+        contextPromises.push(fetchTarefasManutencaoContext(message));
+        break;
+      case "ordens_servicos":
+        contextPromises.push(fetchOrdensServicoContext(message));
+        break;
+      case "unidades":
+        contextPromises.push(fetchUnidadesContext(message));
+        break;
+      case "setores":
+        contextPromises.push(fetchSetoresContext(message));
+        break;
+      case "centros_de_custo":
+        contextPromises.push(fetchCentrosCustoContext(message));
+        break;
+    }
+  }
+
+  const results = await Promise.all(contextPromises);
+  fullContext += results.join("");
+
+  fullContext += "\n\n=== INSTRUÇÕES PARA RESPOSTA ===\nUse APENAS os dados acima para responder à pergunta do usuário. Se o dado solicitado não estiver presente, informe que não foi encontrado. Formate a resposta de forma clara e organizada. Se for solicitado um relatório, organize os dados em formato tabular ou lista estruturada.";
+
+  return {
+    hasRelevantData: true,
+    context: fullContext,
+    fallbackAnswer: "Encontrei dados relevantes no sistema. Por favor, veja os detalhes acima.",
+  };
 };
 
 const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit & { timeoutMs?: number }) => {
@@ -260,7 +791,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit & {
   }
 };
 
-// Configuração da API do Groq (chamada direta)
+// Configuração da API do Groq
 const GROQ_CONFIG = {
   baseUrl: "https://api.groq.com/openai/v1",
   apiKey: "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",
@@ -269,18 +800,14 @@ const GROQ_CONFIG = {
 
 // Componente para renderizar Markdown básico
 const SimpleMarkdown = ({ content }: { content: string }) => {
-  // Processa markdown básico: **bold**, *italic*, `code`
   const processMarkdown = (text: string): React.ReactNode[] => {
     const parts: React.ReactNode[] = [];
     let remaining = text;
     let key = 0;
     
     while (remaining.length > 0) {
-      // Bold: **text**
       const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-      // Italic: *text*
       const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
-      // Code: `text`
       const codeMatch = remaining.match(/`(.+?)`/);
       
       const matches = [
@@ -296,12 +823,10 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
       
       const firstMatch = matches[0]!;
       
-      // Add text before match
       if (firstMatch.index > 0) {
         parts.push(<span key={key++}>{remaining.slice(0, firstMatch.index)}</span>);
       }
       
-      // Add formatted text
       const matchedText = firstMatch.match[1];
       switch (firstMatch.type) {
         case 'bold':
@@ -321,7 +846,6 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
     return parts;
   };
   
-  // Divide por linhas para preservar quebras de linha
   const lines = content.split('\n');
   
   return (
@@ -342,7 +866,19 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
     {
       id: "welcome",
       role: "assistant",
-      content: `Olá! Eu sou o **APEX Chat**, seu assistente virtual. Como posso ajudá-lo hoje?`,
+      content: `Olá! Eu sou o **APEX Chat**, seu assistente virtual com acesso completo aos dados do sistema.
+
+Posso ajudá-lo com informações sobre:
+- **Produtos**: estoque, preços, fornecedores, vencimentos
+- **Fornecedores**: CNPJ, contatos, condições de pagamento
+- **Equipamentos/Máquinas**: patrimônio, setores, status
+- **Manutentores**: equipe técnica, contatos
+- **Tarefas de Manutenção**: agendamentos, frequências
+- **Ordens de Serviço**: abertas, pendentes, concluídas
+- **Manuais**: documentação técnica
+- **E muito mais!**
+
+Como posso ajudá-lo hoje?`,
       timestamp: new Date(),
     },
   ]);
@@ -354,7 +890,6 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    // Query simples sem orderBy composto para evitar necessidade de índices
     const chatRef = collection(db, "chat_messages");
     const q = query(
       chatRef,
@@ -374,10 +909,7 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
         });
       });
 
-      // Ordenar no cliente por timestamp
       history.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-      // Limitar aos últimos 50 mensagens
       const recentHistory = history.slice(-50);
 
       if (recentHistory.length > 0) {
@@ -385,7 +917,7 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
           {
             id: "welcome",
             role: "assistant",
-            content: `Olá! Eu sou o **APEX Chat**, seu assistente virtual. Como posso ajudá-lo hoje?`,
+            content: `Olá! Eu sou o **APEX Chat**, seu assistente virtual com acesso completo aos dados do sistema. Como posso ajudá-lo hoje?`,
             timestamp: new Date(),
           },
           ...recentHistory
@@ -413,7 +945,6 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
     setInput("");
     setIsLoading(true);
     
-    // Adicionar mensagem do usuário imediatamente na UI
     const userMessage: Message = {
       id: "user-" + Date.now(),
       role: "user",
@@ -422,7 +953,7 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
     };
     setMessages((prev) => [...prev, userMessage]);
     
-    let produtosContext: ProdutosEndpointResult = { isProdutosRequest: false, context: "", fallbackAnswer: "" };
+    let databaseContext: DatabaseContextResult = { hasRelevantData: false, context: "", fallbackAnswer: "" };
 
     try {
       // 1. Salvar mensagem do usuário no Firebase
@@ -433,8 +964,8 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
         createdAt: serverTimestamp(),
       });
 
-      // 2. Buscar contexto de produtos se necessário
-      produtosContext = await localProdutosEndpoint(userContent);
+      // 2. Buscar contexto de todas as coleções relevantes
+      databaseContext = await fetchDatabaseContext(userContent);
 
       // 3. Preparar o histórico de mensagens para o contexto
       const conversationHistory = messages.slice(-10).map(m => ({
@@ -449,19 +980,33 @@ Informações do usuário:
 - Nome: ${userData?.nome || user.email || "Usuário"}
 - Email: ${user?.email || "Não informado"}
 
-Diretrizes adicionais:
-- Utilize as informações do usuário quando relevante para personalizar as respostas
-- Forneça respostas claras, concisas e úteis
-- Se não souber algo, seja honesto e ofereça ajuda alternativa
-- Mantenha um tom amigável e profissional
+Você é o APEX Chat, um assistente virtual do sistema APEX HUB com ACESSO TOTAL aos dados do sistema.
+Você tem acesso às seguintes coleções do banco de dados:
+- produtos: informações de estoque, preços, fornecedores, vencimentos
+- fornecedores: razão social, CNPJ, contatos, condições de pagamento, endereços
+- equipamentos: máquinas, patrimônio, setores, tags, status
+- manutentores: técnicos de manutenção, contatos, setores
+- manuais: documentação técnica, instruções
+- tarefas_manutencao: tarefas preventivas, agendamentos
+- ordens_servicos: ordens de serviço abertas e concluídas
+- unidades: filiais, endereços
+- setores: departamentos
+- centros_de_custo: gestão financeira
+
+Diretrizes:
+- SEMPRE use os dados fornecidos no contexto para responder
+- Se perguntarem sobre quantidades, valores ou dados específicos, consulte os dados fornecidos
+- Formate respostas de forma clara e organizada
+- Para relatórios, use listas ou formato tabular
+- Seja preciso e cite os dados exatos encontrados
+- Se não encontrar o dado solicitado, informe claramente
 - Responda sempre em português do Brasil`;
 
       // 5. Preparar as mensagens para a API Groq
-      const fullSystemPrompt = produtosContext.isProdutosRequest 
-        ? `${systemPrompt}\n\n${produtosContext.context}`
+      const fullSystemPrompt = databaseContext.hasRelevantData 
+        ? `${systemPrompt}${databaseContext.context}`
         : systemPrompt;
 
-      // Montar mensagens no formato da API OpenAI (compatível com Groq)
       const apiMessages = [
         { role: "system", content: fullSystemPrompt },
         ...conversationHistory,
@@ -522,37 +1067,18 @@ Diretrizes adicionais:
     } catch (error) {
       console.error("Chat error:", error);
 
-      // Se foi uma requisição de produtos e temos fallback, usar ele
-      if (produtosContext.isProdutosRequest && produtosContext.fallbackAnswer) {
-        const fallbackMessage: Message = {
-          id: "fallback-" + Date.now(),
-          role: "assistant",
-          content: produtosContext.fallbackAnswer,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, fallbackMessage]);
-        
-        await addDoc(collection(db, "chat_messages"), {
-          userId: user.uid,
-          role: "assistant",
-          content: produtosContext.fallbackAnswer,
-          createdAt: serverTimestamp(),
-        });
-        return;
-      }
-      
-      // Mensagem de erro amigavel
+      // Mensagem de erro amigável
       let errorMessageText = "Desculpe, houve um erro ao processar sua mensagem. ";
       
       if (error instanceof Error) {
         if (error.message.toLowerCase().includes("sem conexao") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-          errorMessageText += "Voce esta offline. Verifique sua conexao com a internet.";
+          errorMessageText += "Você está offline. Verifique sua conexão com a internet.";
         } else if (error.message.includes("API") || error.message.includes("401")) {
-          errorMessageText += "Problema com o servico de IA. Tente novamente.";
+          errorMessageText += "Problema com o serviço de IA. Tente novamente.";
         } else if (error.message.includes("fetch") || error.message.toLowerCase().includes("network") || error.message.toLowerCase().includes("abort")) {
-          errorMessageText += "Nao foi possivel conectar ao servico. Verifique sua conexao com a internet.";
+          errorMessageText += "Não foi possível conectar ao serviço. Verifique sua conexão com a internet.";
         } else if (error.message.includes("429")) {
-          errorMessageText += "Muitas requisicoes. Aguarde alguns segundos e tente novamente.";
+          errorMessageText += "Muitas requisições. Aguarde alguns segundos e tente novamente.";
         } else {
           errorMessageText += error.message;
         }
@@ -645,7 +1171,7 @@ Diretrizes adicionais:
                 <div className="bg-muted rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Digitando...
+                    Consultando dados do sistema...
                   </div>
                 </div>
               </div>
@@ -656,7 +1182,7 @@ Diretrizes adicionais:
         <div className="p-4 border-t">
           <div className="flex gap-2">
             <Input
-              placeholder="Digite sua mensagem..."
+              placeholder="Pergunte sobre produtos, fornecedores, equipamentos..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
