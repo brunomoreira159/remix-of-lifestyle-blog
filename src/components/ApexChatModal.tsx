@@ -19,11 +19,33 @@ import {
 import { db } from "@/firebase/firebase";
 import skillPrompt from "@/AI/Skill.md?raw";
 
+interface ProdutoSugestao {
+  id: string;
+  nome: string;
+  codigo_estoque: string;
+}
+
+interface ProdutoCard {
+  id: string;
+  nome: string;
+  codigo_estoque: string;
+  codigo_material: string;
+  quantidade: number;
+  unidade_de_medida: string;
+  valor_unitario: number;
+  fornecedor_nome: string | null;
+  deposito: string;
+  prateleira: string;
+  imageUrl: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  produtosSugeridos?: ProdutoSugestao[];
+  produtosComImagem?: ProdutoCard[];
 }
 
 interface ApexChatModalProps {
@@ -50,6 +72,7 @@ interface ProdutoChatData {
   fornecedor_cnpj: string | null;
   fornecedor_id: string | null;
   ativo: string;
+  imageUrl?: string;
 }
 
 interface FornecedorChatData {
@@ -153,6 +176,8 @@ interface DatabaseContextResult {
   hasRelevantData: boolean;
   context: string;
   fallbackAnswer: string;
+  produtosSugeridos?: ProdutoSugestao[];
+  produtosComImagem?: ProdutoCard[];
 }
 
 const STOP_WORDS = new Set([
@@ -178,8 +203,6 @@ const formatCurrencyBRL = (value: number) =>
 const detectRelevantCollections = (message: string): string[] => {
   const normalized = normalizeText(message);
   const collections: string[] = [];
-
-  // Produtos - detecta termos de produtos E busca por nomes específicos
   if (/(produto|estoque|deposito|prateleira|vencimento|codigo|material|quantidade|barato|caro|item|itens|preco|valor|peca|pecas|veda|rosca|lubrificante|oleo|filtro|correia|rolamento|parafuso|arruela|anel|junta|vedacao|mangueira|bomba|motor|valvula|sensor|rele|fusivel|lampada|cabo|fio|tubo|conexao|abraca|braçadeira|chapa|barra|cantoneira|perfil|solda|eletrodo|disco|lixa|serra|broca|fresa|ferramenta|epi|luva|oculos|mascara|capacete|bota|uniforme)/.test(normalized)) {
     collections.push("produtos");
   }
@@ -244,7 +267,6 @@ const detectRelevantCollections = (message: string): string[] => {
     }
   }
 
-  console.log("[v0] Coleções detectadas para busca:", collections, "| Mensagem normalizada:", normalized);
   return collections;
 };
 
@@ -256,21 +278,47 @@ const extractSearchTerms = (message: string) => {
     .slice(0, 5);
 };
 
+// Busca bruta de produtos retornando objetos completos (para sugestões e cards)
+const fetchProdutosRaw = async (): Promise<ProdutoChatData[]> => {
+  try {
+    const snap = await getDocs(query(collection(db, "produtos"), limit(500)));
+    return snap.docs.map((docRef) => {
+      const d = docRef.data();
+      return {
+        id: docRef.id,
+        codigo_estoque: d.codigo_estoque || d.codigoEstoque || "",
+        codigo_material: d.codigo_material || d.codigoMaterial || "",
+        nome: d.nome || d.descricao || d.produto || "",
+        quantidade: d.quantidade ?? d.qtd ?? d.qtdEstoque ?? 0,
+        quantidade_minima: d.quantidade_minima || d.quantidadeMinima || 0,
+        valor_unitario: d.valor_unitario || d.valorUnitario || d.preco || 0,
+        unidade_de_medida: d.unidade_de_medida || d.unidadeMedida || d.un || "",
+        deposito: d.deposito || d.almoxarifado || "",
+        prateleira: d.prateleira || "",
+        unidade: d.unidade || d.filial || "",
+        detalhes: d.detalhes || d.observacao || "",
+        data_vencimento: d.data_vencimento || d.dataVencimento || "",
+        fornecedor_nome: d.fornecedor_nome || d.fornecedorNome || null,
+        fornecedor_cnpj: d.fornecedor_cnpj || d.fornecedorCnpj || null,
+        fornecedor_id: d.fornecedor_id || d.fornecedorId || null,
+        ativo: d.ativo ?? d.status ?? "sim",
+        imageUrl: d.imageUrl || d.imagem || d.foto || d.image || d.url_imagem || null,
+      } as ProdutoChatData;
+    });
+  } catch {
+    return [];
+  }
+};
+
 // Buscar dados de produtos
 const fetchProdutosContext = async (message: string): Promise<string> => {
   try {
-    console.log("[v0] Iniciando busca de produtos...");
-    
-    // Tentar buscar com ordenação, se falhar, buscar sem ordenação
     let produtosSnapshot;
     try {
       produtosSnapshot = await getDocs(query(collection(db, "produtos"), limit(500)));
     } catch (queryError) {
-      console.log("[v0] Erro na query ordenada, tentando query simples:", queryError);
       produtosSnapshot = await getDocs(collection(db, "produtos"));
     }
-    
-    console.log("[v0] Produtos encontrados no Firestore:", produtosSnapshot.docs.length);
     
     const produtos = produtosSnapshot.docs.map((docRef) => {
       const data = docRef.data();
@@ -295,11 +343,6 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
       } as ProdutoChatData;
     });
 
-    console.log("[v0] Produtos mapeados:", produtos.length);
-    if (produtos.length > 0) {
-      console.log("[v0] Exemplo de produto:", JSON.stringify(produtos[0]));
-    }
-
     const normalizedMessage = normalizeText(message);
     let filtered = [...produtos];
 
@@ -320,9 +363,7 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
       filtered = filtered.filter((p) => p.quantidade < p.quantidade_minima);
     }
 
-    // Busca por termos específicos - mais flexível
     const searchTerms = extractSearchTerms(message);
-    console.log("[v0] Termos de busca extraídos:", searchTerms);
     
     if (searchTerms.length > 0) {
       const filteredBySearch = filtered.filter((produto) => {
@@ -332,12 +373,8 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
         return searchTerms.some((term) => base.includes(term));
       });
       
-      // Se encontrou resultados com os termos, usar eles. Senão, mostrar todos.
       if (filteredBySearch.length > 0) {
         filtered = filteredBySearch;
-        console.log("[v0] Produtos após filtro por termos:", filtered.length);
-      } else {
-        console.log("[v0] Nenhum produto encontrado com termos de busca, mostrando todos");
       }
     }
 
@@ -763,13 +800,9 @@ const fetchCentrosCustoContext = async (message: string): Promise<string> => {
 
 // Função principal que busca contexto de todas as coleções relevantes
 const fetchDatabaseContext = async (message: string): Promise<DatabaseContextResult> => {
-  console.log("[v0] Iniciando fetchDatabaseContext para:", message);
   const collections = detectRelevantCollections(message);
   
-  console.log("[v0] Coleções a serem consultadas:", collections);
-  
   if (collections.length === 0) {
-    console.log("[v0] Nenhuma coleção detectada para a mensagem");
     return {
       hasRelevantData: false,
       context: "",
@@ -816,18 +849,59 @@ const fetchDatabaseContext = async (message: string): Promise<DatabaseContextRes
     }
   }
 
+  // Se consultar produtos, também calcular sugestões e cards com imagem em paralelo
+  let produtosSugeridos: ProdutoSugestao[] | undefined;
+  let produtosComImagem: ProdutoCard[] | undefined;
+
+  if (collections.includes("produtos")) {
+    const todosOsProdutos = await fetchProdutosRaw();
+    const searchTerms = extractSearchTerms(message);
+
+    // Produtos que correspondem à busca (parcial ou completa)
+    const matched = todosOsProdutos.filter((p) => {
+      const base = normalizeText(`${p.nome} ${p.codigo_estoque} ${p.codigo_material} ${p.detalhes}`);
+      return searchTerms.some((t) => base.includes(t));
+    });
+
+    // Se há mais de 1 produto relacionado, sugerir os demais como chips
+    if (matched.length > 1) {
+      produtosSugeridos = matched.slice(0, 8).map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        codigo_estoque: p.codigo_estoque,
+      }));
+    }
+
+    // Produtos com imagem vinculada
+    const comImagem = matched.filter((p) => p.imageUrl && p.imageUrl.length > 0);
+    if (comImagem.length > 0) {
+      produtosComImagem = comImagem.slice(0, 6).map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        codigo_estoque: p.codigo_estoque,
+        codigo_material: p.codigo_material,
+        quantidade: p.quantidade,
+        unidade_de_medida: p.unidade_de_medida,
+        valor_unitario: p.valor_unitario,
+        fornecedor_nome: p.fornecedor_nome,
+        deposito: p.deposito,
+        prateleira: p.prateleira,
+        imageUrl: p.imageUrl!,
+      }));
+    }
+  }
+
   const results = await Promise.all(contextPromises);
-  console.log("[v0] Resultados das buscas:", results.map(r => r.substring(0, 100)));
   fullContext += results.join("");
   
   fullContext += "\n\n=== INSTRUÇÕES PARA RESPOSTA ===\nUse APENAS os dados acima para responder à pergunta do usuário. Se o dado solicitado não estiver presente, informe que não foi encontrado. Formate a resposta de forma clara e organizada. Se for solicitado um relatório, organize os dados em formato tabular ou lista estruturada.";
-  
-  console.log("[v0] Contexto final (primeiros 500 chars):", fullContext.substring(0, 500));
 
   return {
     hasRelevantData: true,
     context: fullContext,
     fallbackAnswer: "Encontrei dados relevantes no sistema. Por favor, veja os detalhes acima.",
+    produtosSugeridos,
+    produtosComImagem,
   };
 };
 
@@ -1017,9 +1091,7 @@ Como posso ajudá-lo hoje?`,
       });
 
       // 2. Buscar contexto de todas as coleções relevantes
-      console.log("[v0] Buscando contexto do banco de dados para:", userContent);
       databaseContext = await fetchDatabaseContext(userContent);
-      console.log("[v0] Contexto obtido - hasRelevantData:", databaseContext.hasRelevantData, "tamanho do contexto:", databaseContext.context.length);
 
       // 3. Preparar o histórico de mensagens para o contexto
       const conversationHistory = messages.slice(-10).map(m => ({
@@ -1107,6 +1179,8 @@ Diretrizes:
         role: "assistant",
         content: assistantContent,
         timestamp: new Date(),
+        produtosSugeridos: databaseContext.produtosSugeridos,
+        produtosComImagem: databaseContext.produtosComImagem,
       };
       setMessages((prev) => [...prev, assistantMessage]);
       
@@ -1192,28 +1266,96 @@ Diretrizes:
                     <User className="w-4 h-4 text-muted-foreground" />
                   </div>
                 )}
-                <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
-                  <div className="text-sm whitespace-pre-wrap">
-                    <SimpleMarkdown content={message.content} />
-                  </div>
-                  <p
-                    className={`text-xs mt-1 ${
+                <div className={`max-w-[80%] flex flex-col gap-2 ${message.role === "user" ? "items-end" : "items-start"}`}>
+                  <div
+                    className={`rounded-lg px-3 py-2 ${
                       message.role === "user"
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
                     }`}
                   >
-                    {message.timestamp.toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                    <div className="text-sm whitespace-pre-wrap">
+                      <SimpleMarkdown content={message.content} />
+                    </div>
+                    <p
+                      className={`text-xs mt-1 ${
+                        message.role === "user"
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {message.timestamp.toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Cards de produtos com imagem */}
+                  {message.role === "assistant" && message.produtosComImagem && message.produtosComImagem.length > 0 && (
+                    <div className="flex flex-col gap-2 w-full">
+                      {message.produtosComImagem.map((prod) => (
+                        <div
+                          key={prod.id}
+                          className="rounded-lg border bg-card overflow-hidden flex gap-3 p-3 shadow-sm"
+                        >
+                          <img
+                            src={prod.imageUrl}
+                            alt={prod.nome}
+                            className="w-16 h-16 object-cover rounded-md flex-shrink-0 bg-muted"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-xs font-semibold text-foreground leading-tight truncate">{prod.nome}</span>
+                            {prod.codigo_estoque && (
+                              <span className="text-xs text-muted-foreground">Cód: {prod.codigo_estoque}</span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              Qtd: <span className={`font-medium ${prod.quantidade <= 0 ? "text-destructive" : "text-foreground"}`}>{prod.quantidade}</span>
+                              {prod.unidade_de_medida ? ` ${prod.unidade_de_medida}` : ""}
+                            </span>
+                            {prod.valor_unitario > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                Valor: <span className="font-medium text-foreground">{formatCurrencyBRL(prod.valor_unitario)}</span>
+                              </span>
+                            )}
+                            {prod.fornecedor_nome && (
+                              <span className="text-xs text-muted-foreground truncate">Fornecedor: {prod.fornecedor_nome}</span>
+                            )}
+                            {(prod.deposito || prod.prateleira) && (
+                              <span className="text-xs text-muted-foreground">
+                                {prod.deposito}{prod.prateleira ? ` / ${prod.prateleira}` : ""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Chips de sugestões de produtos relacionados */}
+                  {message.role === "assistant" && message.produtosSugeridos && message.produtosSugeridos.length > 1 && (
+                    <div className="flex flex-col gap-1.5 w-full">
+                      <span className="text-xs text-muted-foreground">Produtos relacionados encontrados — clique para consultar:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {message.produtosSugeridos.map((sug) => (
+                          <button
+                            key={sug.id}
+                            type="button"
+                            onClick={() => setInput(sug.nome)}
+                            className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs text-primary font-medium hover:bg-primary/15 hover:border-primary/60 transition-colors cursor-pointer"
+                          >
+                            {sug.nome}
+                            {sug.codigo_estoque && (
+                              <span className="text-primary/60">#{sug.codigo_estoque}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
