@@ -461,6 +461,9 @@ Diretrizes adicionais:
         throw new Error("Sem conexao com a internet");
       }
 
+      console.log("[v0] Calling chat API with messages:", apiMessages.length);
+      console.log("[v0] System prompt length:", fullSystemPrompt.length);
+
       const response = await fetchWithTimeout(CHAT_API_URL, {
         method: "POST",
         headers: {
@@ -473,9 +476,11 @@ Diretrizes adicionais:
         timeoutMs: 30000,
       } as any);
 
+      console.log("[v0] Response status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error("Chat API Error:", response.status, errorData);
+        console.error("[v0] Chat API Error:", response.status, errorData);
         
         if (response.status === 429) {
           throw new Error("Limite de requisicoes excedido. Aguarde um momento.");
@@ -485,6 +490,7 @@ Diretrizes adicionais:
       }
 
       const data = await response.json();
+      console.log("[v0] Response data:", data);
       const assistantContent = data.content || "Desculpe, nao consegui processar sua mensagem no momento.";
       
       // 7. Adicionar mensagem da assistente na UI
