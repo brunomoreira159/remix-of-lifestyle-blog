@@ -260,29 +260,8 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit & {
   }
 };
 
-const envNim = ((import.meta as any)?.env ?? {}) as Record<string, string | undefined>;
-const NVIDIA_NIM_CONFIG = {
-  baseUrl: envNim.VITE_NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
-  apiKey: envNim.VITE_NVIDIA_API_KEY || "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",
-  model: envNim.VITE_NVIDIA_MODEL || "z-ai/glm4.7",
-};
-
-// Função para extrair o conteúdo da resposta, removendo tags de pensamento do modelo
-const extractContentFromResponse = (rawContent: string): string => {
-  if (!rawContent) return "";
-  
-  // Modelo Qwen com enable_thinking pode retornar tags <think>...</think>
-  // Precisamos remover essas tags e extrair apenas o conteúdo real
-  let content = rawContent;
-  
-  // Remove tags <think> e seu conteúdo (modo de pensamento do modelo)
-  content = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  
-  // Remove tags vazias ou whitespace excessivo
-  content = content.replace(/^\s*\n+/g, "").trim();
-  
-  return content || rawContent;
-};
+// Configuração da API do chat (usando Groq via Vercel Serverless Function)
+const CHAT_API_URL = "/api/chat";
 
 // Componente para renderizar Markdown básico
 const SimpleMarkdown = ({ content }: { content: string }) => {
@@ -467,77 +446,46 @@ Diretrizes adicionais:
 - Mantenha um tom amigável e profissional
 - Responda sempre em português do Brasil`;
 
-      // 5. Preparar o corpo da requisição para NVIDIA NIM
-      const requestBody = {
-        model: NVIDIA_NIM_CONFIG.model,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          ...(produtosContext.isProdutosRequest ? [{ role: "system", content: produtosContext.context }] : []),
-          ...conversationHistory,
-          { role: "user", content: userContent }
-        ],
-        max_tokens: 4096,
-        temperature: 0.7,
-        top_p: 0.95,
-        stream: false,
-      };
+      // 5. Preparar as mensagens para a API Groq
+      const fullSystemPrompt = produtosContext.isProdutosRequest 
+        ? `${systemPrompt}\n\n${produtosContext.context}`
+        : systemPrompt;
 
-      // 6. Fazer requisição para NVIDIA NIM
-      console.log("Enviando requisição para NVIDIA NIM...");
+      const apiMessages = [
+        ...conversationHistory,
+        { role: "user", content: userContent }
+      ];
+
+      // 6. Fazer requisição para a API Groq (via Vercel Serverless Function)
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        throw new Error("Sem conexão com a internet");
-      }
-      if (!NVIDIA_NIM_CONFIG.apiKey) {
-        throw new Error("Chave de API NVIDIA não configurada. Defina VITE_NVIDIA_API_KEY.");
-      }
-      let response: Response | undefined;
-      try {
-        response = await fetchWithTimeout(`${NVIDIA_NIM_CONFIG.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${NVIDIA_NIM_CONFIG.apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-          timeoutMs: 15000,
-        } as any);
-      } catch (e) {
-        await new Promise((r) => setTimeout(r, 900));
-        response = await fetchWithTimeout(`${NVIDIA_NIM_CONFIG.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${NVIDIA_NIM_CONFIG.apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-          timeoutMs: 20000,
-        } as any);
+        throw new Error("Sem conexao com a internet");
       }
 
-      if (!response!.ok) {
-        const errorData = await response!.json().catch(() => ({}));
-        console.error("NVIDIA API Error:", response.status, errorData);
+      const response = await fetchWithTimeout(CHAT_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: apiMessages,
+          systemPrompt: fullSystemPrompt,
+        }),
+        timeoutMs: 30000,
+      } as any);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Chat API Error:", response.status, errorData);
         
-        // Tratamento específico para erros comuns
-        if (response!.status === 401) {
-          throw new Error("Chave API inválida. Verifique suas credenciais NVIDIA.");
-        } else if (response!.status === 429) {
-          throw new Error("Limite de requisições excedido. Aguarde um momento.");
-        } else if (response!.status === 503) {
-          throw new Error("Serviço NVIDIA temporariamente indisponível. Tente novamente.");
+        if (response.status === 429) {
+          throw new Error("Limite de requisicoes excedido. Aguarde um momento.");
         } else {
-          throw new Error(errorData.error?.message || `Erro NVIDIA API: ${response!.status}`);
+          throw new Error(errorData.error || `Erro na API: ${response.status}`);
         }
       }
 
-      const data = await response!.json();
-      
-      // Extrair conteúdo da resposta, processando possíveis tags de pensamento
-      const rawContent = data.choices?.[0]?.message?.content || "";
-      const assistantContent = extractContentFromResponse(rawContent) || "Desculpe, não consegui processar sua mensagem no momento.";
+      const data = await response.json();
+      const assistantContent = data.content || "Desculpe, nao consegui processar sua mensagem no momento.";
       
       // 7. Adicionar mensagem da assistente na UI
       const assistantMessage: Message = {
@@ -578,18 +526,18 @@ Diretrizes adicionais:
         return;
       }
       
-      // Mensagem de erro amigável
+      // Mensagem de erro amigavel
       let errorMessageText = "Desculpe, houve um erro ao processar sua mensagem. ";
       
       if (error instanceof Error) {
-        if (error.message.toLowerCase().includes("sem conexão") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-          errorMessageText += "Você está offline. Verifique sua conexão com a internet.";
-        } else if (error.message.includes("API key") || error.message.includes("401") || error.message.includes("não configurada")) {
-          errorMessageText += "Problema com a autenticação da API NVIDIA. Verifique a chave de API.";
+        if (error.message.toLowerCase().includes("sem conexao") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+          errorMessageText += "Voce esta offline. Verifique sua conexao com a internet.";
+        } else if (error.message.includes("API") || error.message.includes("401")) {
+          errorMessageText += "Problema com o servico de IA. Tente novamente.";
         } else if (error.message.includes("fetch") || error.message.toLowerCase().includes("network") || error.message.toLowerCase().includes("abort")) {
-          errorMessageText += "Não foi possível conectar ao serviço NVIDIA. Verifique sua conexão com a internet.";
+          errorMessageText += "Nao foi possivel conectar ao servico. Verifique sua conexao com a internet.";
         } else if (error.message.includes("429")) {
-          errorMessageText += "Muitas requisições. Aguarde alguns segundos e tente novamente.";
+          errorMessageText += "Muitas requisicoes. Aguarde alguns segundos e tente novamente.";
         } else {
           errorMessageText += error.message;
         }
