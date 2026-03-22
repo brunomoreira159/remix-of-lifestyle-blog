@@ -179,23 +179,23 @@ const detectRelevantCollections = (message: string): string[] => {
   const normalized = normalizeText(message);
   const collections: string[] = [];
 
-  // Produtos
-  if (/(produto|estoque|deposito|prateleira|vencimento|codigo|material|quantidade|barato|caro|item|itens|preco|valor)/.test(normalized)) {
+  // Produtos - detecta termos de produtos E busca por nomes específicos
+  if (/(produto|estoque|deposito|prateleira|vencimento|codigo|material|quantidade|barato|caro|item|itens|preco|valor|peca|pecas|veda|rosca|lubrificante|oleo|filtro|correia|rolamento|parafuso|arruela|anel|junta|vedacao|mangueira|bomba|motor|valvula|sensor|rele|fusivel|lampada|cabo|fio|tubo|conexao|abraca|braçadeira|chapa|barra|cantoneira|perfil|solda|eletrodo|disco|lixa|serra|broca|fresa|ferramenta|epi|luva|oculos|mascara|capacete|bota|uniforme)/.test(normalized)) {
     collections.push("produtos");
   }
 
   // Fornecedores
-  if (/(fornecedor|cnpj|razao social|pagamento|prazo entrega|contato|fornece)/.test(normalized)) {
+  if (/(fornecedor|cnpj|razao social|pagamento|prazo entrega|contato|fornece|quem vende|onde compro)/.test(normalized)) {
     collections.push("fornecedores");
   }
 
   // Equipamentos/Máquinas
-  if (/(maquina|equipamento|patrimonio|tag|setor)/.test(normalized) && !/(manutentor)/.test(normalized)) {
+  if (/(maquina|equipamento|patrimonio|tag)/.test(normalized) && !/(manutentor)/.test(normalized)) {
     collections.push("equipamentos");
   }
 
   // Manutentores
-  if (/(manutentor|tecnico|tecnicos|manutencao|quem faz|responsavel)/.test(normalized)) {
+  if (/(manutentor|tecnico|tecnicos|quem faz|responsavel)/.test(normalized) && !/(tarefa|ordem|servico)/.test(normalized)) {
     collections.push("manutentores");
   }
 
@@ -210,12 +210,12 @@ const detectRelevantCollections = (message: string): string[] => {
   }
 
   // Ordens de Serviço
-  if (/(ordem|ordens|os|servico|servicos|aberta|pendente|concluida)/.test(normalized)) {
+  if (/(ordem|ordens|os\b|servico|servicos|aberta|pendente|concluida)/.test(normalized)) {
     collections.push("ordens_servicos");
   }
 
   // Unidades
-  if (/(unidade|unidades|filial|filiais|loja|lojas)/.test(normalized)) {
+  if (/(unidade|unidades|filial|filiais|loja|lojas)/.test(normalized) && !/(medida)/.test(normalized)) {
     collections.push("unidades");
   }
 
@@ -230,11 +230,21 @@ const detectRelevantCollections = (message: string): string[] => {
   }
 
   // Se não detectou nenhuma coleção específica mas parece uma pergunta sobre dados
-  if (collections.length === 0 && /(quantos|quantas|lista|listar|mostre|mostrar|tem|temos|existe|buscar|encontrar|relatorio|resumo|total)/.test(normalized)) {
+  // SEMPRE buscar em produtos por padrão quando for pergunta sobre dados
+  if (collections.length === 0 && /(quantos|quantas|lista|listar|mostre|mostrar|tem|temos|existe|buscar|encontrar|relatorio|resumo|total|qual|quais|onde|como|quanto)/.test(normalized)) {
     // Buscar em todas as coleções principais
     collections.push("produtos", "fornecedores", "equipamentos");
   }
 
+  // Se ainda não detectou nada, mas a mensagem parece uma busca específica, buscar em produtos
+  if (collections.length === 0) {
+    const words = normalized.split(/\s+/).filter(w => w.length >= 3);
+    if (words.length >= 1 && words.length <= 10) {
+      collections.push("produtos");
+    }
+  }
+
+  console.log("[v0] Coleções detectadas para busca:", collections, "| Mensagem normalizada:", normalized);
   return collections;
 };
 
@@ -249,38 +259,59 @@ const extractSearchTerms = (message: string) => {
 // Buscar dados de produtos
 const fetchProdutosContext = async (message: string): Promise<string> => {
   try {
-    const produtosSnapshot = await getDocs(query(collection(db, "produtos"), orderBy("nome"), limit(500)));
+    console.log("[v0] Iniciando busca de produtos...");
+    
+    // Tentar buscar com ordenação, se falhar, buscar sem ordenação
+    let produtosSnapshot;
+    try {
+      produtosSnapshot = await getDocs(query(collection(db, "produtos"), limit(500)));
+    } catch (queryError) {
+      console.log("[v0] Erro na query ordenada, tentando query simples:", queryError);
+      produtosSnapshot = await getDocs(collection(db, "produtos"));
+    }
+    
+    console.log("[v0] Produtos encontrados no Firestore:", produtosSnapshot.docs.length);
+    
     const produtos = produtosSnapshot.docs.map((docRef) => {
       const data = docRef.data();
       return {
         id: docRef.id,
-        codigo_estoque: data.codigo_estoque || "",
-        codigo_material: data.codigo_material || "",
-        nome: data.nome || "",
-        quantidade: data.quantidade || 0,
-        quantidade_minima: data.quantidade_minima || 0,
-        valor_unitario: data.valor_unitario || 0,
-        unidade_de_medida: data.unidade_de_medida || "",
-        deposito: data.deposito || "",
-        prateleira: data.prateleira || "",
-        unidade: data.unidade || "",
-        detalhes: data.detalhes || "",
-        data_vencimento: data.data_vencimento || "",
-        fornecedor_nome: data.fornecedor_nome || null,
-        fornecedor_cnpj: data.fornecedor_cnpj || null,
-        fornecedor_id: data.fornecedor_id || null,
-        ativo: data.ativo || "sim",
+        codigo_estoque: data.codigo_estoque || data.codigoEstoque || "",
+        codigo_material: data.codigo_material || data.codigoMaterial || "",
+        nome: data.nome || data.descricao || data.produto || "",
+        quantidade: data.quantidade || data.qtd || data.qtdEstoque || 0,
+        quantidade_minima: data.quantidade_minima || data.quantidadeMinima || data.estoqueMinimo || 0,
+        valor_unitario: data.valor_unitario || data.valorUnitario || data.preco || data.valor || 0,
+        unidade_de_medida: data.unidade_de_medida || data.unidadeMedida || data.un || "",
+        deposito: data.deposito || data.almoxarifado || "",
+        prateleira: data.prateleira || data.localizacao || "",
+        unidade: data.unidade || data.filial || "",
+        detalhes: data.detalhes || data.observacao || data.obs || "",
+        data_vencimento: data.data_vencimento || data.dataVencimento || data.validade || "",
+        fornecedor_nome: data.fornecedor_nome || data.fornecedorNome || data.fornecedor || null,
+        fornecedor_cnpj: data.fornecedor_cnpj || data.fornecedorCnpj || data.cnpjFornecedor || null,
+        fornecedor_id: data.fornecedor_id || data.fornecedorId || null,
+        ativo: data.ativo ?? data.status ?? "sim",
       } as ProdutoChatData;
     });
+
+    console.log("[v0] Produtos mapeados:", produtos.length);
+    if (produtos.length > 0) {
+      console.log("[v0] Exemplo de produto:", JSON.stringify(produtos[0]));
+    }
 
     const normalizedMessage = normalizeText(message);
     let filtered = [...produtos];
 
     // Filtros inteligentes
     if (normalizedMessage.includes("inativo")) {
-      filtered = filtered.filter((p) => normalizeText(p.ativo) === "nao" || normalizeText(p.ativo) === "não");
+      filtered = filtered.filter((p) => normalizeText(String(p.ativo)) === "nao" || normalizeText(String(p.ativo)) === "não" || p.ativo === false);
     } else if (!normalizedMessage.includes("todos") && !normalizedMessage.includes("todas")) {
-      filtered = filtered.filter((p) => normalizeText(p.ativo) !== "nao" && normalizeText(p.ativo) !== "não");
+      // Por padrão, mostrar apenas ativos
+      filtered = filtered.filter((p) => {
+        const ativoStr = normalizeText(String(p.ativo));
+        return ativoStr !== "nao" && ativoStr !== "não" && p.ativo !== false && p.ativo !== "false";
+      });
     }
 
     if (/(zerado|sem estoque|esgotado|quantidade zero)/.test(normalizedMessage)) {
@@ -289,15 +320,25 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
       filtered = filtered.filter((p) => p.quantidade < p.quantidade_minima);
     }
 
-    // Busca por termos específicos
+    // Busca por termos específicos - mais flexível
     const searchTerms = extractSearchTerms(message);
+    console.log("[v0] Termos de busca extraídos:", searchTerms);
+    
     if (searchTerms.length > 0) {
-      filtered = filtered.filter((produto) => {
+      const filteredBySearch = filtered.filter((produto) => {
         const base = normalizeText(
           `${produto.nome} ${produto.codigo_estoque} ${produto.codigo_material} ${produto.detalhes} ${produto.fornecedor_nome || ""} ${produto.fornecedor_cnpj || ""} ${produto.deposito} ${produto.prateleira} ${produto.unidade}`
         );
         return searchTerms.some((term) => base.includes(term));
       });
+      
+      // Se encontrou resultados com os termos, usar eles. Senão, mostrar todos.
+      if (filteredBySearch.length > 0) {
+        filtered = filteredBySearch;
+        console.log("[v0] Produtos após filtro por termos:", filtered.length);
+      } else {
+        console.log("[v0] Nenhum produto encontrado com termos de busca, mostrando todos");
+      }
     }
 
     // Ordenação
@@ -307,9 +348,13 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
       filtered.sort((a, b) => b.valor_unitario - a.valor_unitario);
     }
 
-    const topProdutos = filtered.slice(0, 20);
+    const topProdutos = filtered.slice(0, 30);
     const totalProdutos = produtos.length;
     const totalFiltrado = filtered.length;
+
+    if (topProdutos.length === 0) {
+      return `\n\n=== COLEÇÃO PRODUTOS ===\nTotal de produtos no sistema: ${totalProdutos}\nNenhum produto encontrado com os critérios de busca.`;
+    }
 
     const contextoProdutos = topProdutos
       .map((p, i) =>
@@ -319,8 +364,8 @@ const fetchProdutosContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO PRODUTOS ===\nTotal de produtos no sistema: ${totalProdutos}\nProdutos encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topProdutos.length} registros:\n${contextoProdutos}`;
   } catch (error) {
-    console.error("Erro ao buscar produtos:", error);
-    return "\n\n=== COLEÇÃO PRODUTOS ===\nErro ao acessar dados de produtos.";
+    console.error("[v0] Erro ao buscar produtos:", error);
+    return `\n\n=== COLEÇÃO PRODUTOS ===\nErro ao acessar dados de produtos: ${error instanceof Error ? error.message : "Erro desconhecido"}`;
   }
 };
 
@@ -367,8 +412,8 @@ const fetchFornecedoresContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO FORNECEDORES ===\nTotal de fornecedores no sistema: ${totalFornecedores}\nFornecedores encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topFornecedores.length} registros:\n${contextoFornecedores}`;
   } catch (error) {
-    console.error("Erro ao buscar fornecedores:", error);
-    return "\n\n=== COLEÇÃO FORNECEDORES ===\nErro ao acessar dados de fornecedores.";
+    console.error("[v0] Erro ao buscar fornecedores:", error);
+    return `\n\n=== COLEÇÃO FORNECEDORES ===\nErro ao acessar dados de fornecedores: ${error instanceof Error ? error.message : "Erro desconhecido"}`;
   }
 };
 
@@ -411,8 +456,8 @@ const fetchEquipamentosContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO EQUIPAMENTOS/MÁQUINAS ===\nTotal de equipamentos no sistema: ${totalEquipamentos}\nEquipamentos encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topEquipamentos.length} registros:\n${contextoEquipamentos}`;
   } catch (error) {
-    console.error("Erro ao buscar equipamentos:", error);
-    return "\n\n=== COLEÇÃO EQUIPAMENTOS ===\nErro ao acessar dados de equipamentos.";
+    console.error("[v0] Erro ao buscar equipamentos:", error);
+    return `\n\n=== COLEÇÃO EQUIPAMENTOS ===\nErro ao acessar dados de equipamentos: ${error instanceof Error ? error.message : "Erro desconhecido"}`;
   }
 };
 
@@ -455,7 +500,7 @@ const fetchManutentoresContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO MANUTENTORES ===\nTotal de manutentores no sistema: ${totalManutentores}\nManutentores encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topManutentores.length} registros:\n${contextoManutentores}`;
   } catch (error) {
-    console.error("Erro ao buscar manutentores:", error);
+    console.error("[v0] Erro ao buscar manutentores:", error);
     return "\n\n=== COLEÇÃO MANUTENTORES ===\nErro ao acessar dados de manutentores.";
   }
 };
@@ -497,7 +542,7 @@ const fetchManuaisContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO MANUAIS ===\nTotal de manuais no sistema: ${totalManuais}\nManuais encontrados na busca: ${totalFiltrado}\nExibindo os primeiros ${topManuais.length} registros:\n${contextoManuais}`;
   } catch (error) {
-    console.error("Erro ao buscar manuais:", error);
+    console.error("[v0] Erro ao buscar manuais:", error);
     return "\n\n=== COLEÇÃO MANUAIS ===\nErro ao acessar dados de manuais.";
   }
 };
@@ -544,7 +589,7 @@ const fetchTarefasManutencaoContext = async (message: string): Promise<string> =
 
     return `\n\n=== COLEÇÃO TAREFAS DE MANUTENÇÃO ===\nTotal de tarefas no sistema: ${totalTarefas}\nTarefas encontradas na busca: ${totalFiltrado}\nExibindo as primeiras ${topTarefas.length} registros:\n${contextoTarefas}`;
   } catch (error) {
-    console.error("Erro ao buscar tarefas:", error);
+    console.error("[v0] Erro ao buscar tarefas:", error);
     return "\n\n=== COLEÇÃO TAREFAS DE MANUTENÇÃO ===\nErro ao acessar dados de tarefas.";
   }
 };
@@ -597,7 +642,7 @@ const fetchOrdensServicoContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO ORDENS DE SERVIÇO ===\nTotal de ordens no sistema: ${totalOrdens}\nOrdens encontradas na busca: ${totalFiltrado}\nExibindo as primeiras ${topOrdens.length} registros:\n${contextoOrdens}`;
   } catch (error) {
-    console.error("Erro ao buscar ordens:", error);
+    console.error("[v0] Erro ao buscar ordens:", error);
     return "\n\n=== COLEÇÃO ORDENS DE SERVIÇO ===\nErro ao acessar dados de ordens de serviço.";
   }
 };
@@ -636,7 +681,7 @@ const fetchUnidadesContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO UNIDADES ===\nTotal de unidades no sistema: ${unidades.length}\nUnidades encontradas: ${filtered.length}\n${contextoUnidades}`;
   } catch (error) {
-    console.error("Erro ao buscar unidades:", error);
+    console.error("[v0] Erro ao buscar unidades:", error);
     return "\n\n=== COLEÇÃO UNIDADES ===\nErro ao acessar dados de unidades.";
   }
 };
@@ -674,7 +719,7 @@ const fetchSetoresContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO SETORES ===\nTotal de setores no sistema: ${setores.length}\nSetores encontrados: ${filtered.length}\n${contextoSetores}`;
   } catch (error) {
-    console.error("Erro ao buscar setores:", error);
+    console.error("[v0] Erro ao buscar setores:", error);
     return "\n\n=== COLEÇÃO SETORES ===\nErro ao acessar dados de setores.";
   }
 };
@@ -711,16 +756,20 @@ const fetchCentrosCustoContext = async (message: string): Promise<string> => {
 
     return `\n\n=== COLEÇÃO CENTROS DE CUSTO ===\nTotal de centros de custo: ${centros.length}\nCentros encontrados: ${filtered.length}\n${contextoCentros}`;
   } catch (error) {
-    console.error("Erro ao buscar centros de custo:", error);
+    console.error("[v0] Erro ao buscar centros de custo:", error);
     return "\n\n=== COLEÇÃO CENTROS DE CUSTO ===\nErro ao acessar dados de centros de custo.";
   }
 };
 
 // Função principal que busca contexto de todas as coleções relevantes
 const fetchDatabaseContext = async (message: string): Promise<DatabaseContextResult> => {
+  console.log("[v0] Iniciando fetchDatabaseContext para:", message);
   const collections = detectRelevantCollections(message);
   
+  console.log("[v0] Coleções a serem consultadas:", collections);
+  
   if (collections.length === 0) {
+    console.log("[v0] Nenhuma coleção detectada para a mensagem");
     return {
       hasRelevantData: false,
       context: "",
@@ -768,9 +817,12 @@ const fetchDatabaseContext = async (message: string): Promise<DatabaseContextRes
   }
 
   const results = await Promise.all(contextPromises);
+  console.log("[v0] Resultados das buscas:", results.map(r => r.substring(0, 100)));
   fullContext += results.join("");
-
+  
   fullContext += "\n\n=== INSTRUÇÕES PARA RESPOSTA ===\nUse APENAS os dados acima para responder à pergunta do usuário. Se o dado solicitado não estiver presente, informe que não foi encontrado. Formate a resposta de forma clara e organizada. Se for solicitado um relatório, organize os dados em formato tabular ou lista estruturada.";
+  
+  console.log("[v0] Contexto final (primeiros 500 chars):", fullContext.substring(0, 500));
 
   return {
     hasRelevantData: true,
@@ -965,7 +1017,9 @@ Como posso ajudá-lo hoje?`,
       });
 
       // 2. Buscar contexto de todas as coleções relevantes
+      console.log("[v0] Buscando contexto do banco de dados para:", userContent);
       databaseContext = await fetchDatabaseContext(userContent);
+      console.log("[v0] Contexto obtido - hasRelevantData:", databaseContext.hasRelevantData, "tamanho do contexto:", databaseContext.context.length);
 
       // 3. Preparar o histórico de mensagens para o contexto
       const conversationHistory = messages.slice(-10).map(m => ({
