@@ -263,8 +263,94 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit & {
 const envNim = ((import.meta as any)?.env ?? {}) as Record<string, string | undefined>;
 const NVIDIA_NIM_CONFIG = {
   baseUrl: envNim.VITE_NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
-  apiKey: envNim.VITE_NVIDIA_API_KEY || "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",
+  apiKey: envNim.VITE_NVIDIA_API_KEY || "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",
   model: envNim.VITE_NVIDIA_MODEL || "qwen/qwen3.5-122b-a10b",
+};
+
+// Função para extrair o conteúdo da resposta, removendo tags de pensamento do modelo
+const extractContentFromResponse = (rawContent: string): string => {
+  if (!rawContent) return "";
+  
+  // Modelo Qwen com enable_thinking pode retornar tags <think>...</think>
+  // Precisamos remover essas tags e extrair apenas o conteúdo real
+  let content = rawContent;
+  
+  // Remove tags <think> e seu conteúdo (modo de pensamento do modelo)
+  content = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  
+  // Remove tags vazias ou whitespace excessivo
+  content = content.replace(/^\s*\n+/g, "").trim();
+  
+  return content || rawContent;
+};
+
+// Componente para renderizar Markdown básico
+const SimpleMarkdown = ({ content }: { content: string }) => {
+  // Processa markdown básico: **bold**, *italic*, `code`
+  const processMarkdown = (text: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let key = 0;
+    
+    while (remaining.length > 0) {
+      // Bold: **text**
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      // Italic: *text*
+      const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
+      // Code: `text`
+      const codeMatch = remaining.match(/`(.+?)`/);
+      
+      const matches = [
+        boldMatch ? { type: 'bold', match: boldMatch, index: boldMatch.index! } : null,
+        italicMatch ? { type: 'italic', match: italicMatch, index: italicMatch.index! } : null,
+        codeMatch ? { type: 'code', match: codeMatch, index: codeMatch.index! } : null,
+      ].filter(Boolean).sort((a, b) => a!.index - b!.index);
+      
+      if (matches.length === 0) {
+        parts.push(<span key={key++}>{remaining}</span>);
+        break;
+      }
+      
+      const firstMatch = matches[0]!;
+      
+      // Add text before match
+      if (firstMatch.index > 0) {
+        parts.push(<span key={key++}>{remaining.slice(0, firstMatch.index)}</span>);
+      }
+      
+      // Add formatted text
+      const matchedText = firstMatch.match[1];
+      switch (firstMatch.type) {
+        case 'bold':
+          parts.push(<strong key={key++}>{matchedText}</strong>);
+          break;
+        case 'italic':
+          parts.push(<em key={key++}>{matchedText}</em>);
+          break;
+        case 'code':
+          parts.push(<code key={key++} className="bg-muted px-1 rounded text-xs">{matchedText}</code>);
+          break;
+      }
+      
+      remaining = remaining.slice(firstMatch.index + firstMatch.match[0].length);
+    }
+    
+    return parts;
+  };
+  
+  // Divide por linhas para preservar quebras de linha
+  const lines = content.split('\n');
+  
+  return (
+    <>
+      {lines.map((line, idx) => (
+        <span key={idx}>
+          {processMarkdown(line)}
+          {idx < lines.length - 1 && <br />}
+        </span>
+      ))}
+    </>
+  );
 };
 
 const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
@@ -396,9 +482,9 @@ Diretrizes adicionais:
         max_tokens: 16384,
         temperature: 0.60,
         top_p: 0.95,
-        frequency_penalty: 0.3,
-        presence_penalty: 0.3,
-        stream: false, // Desabilitando stream para simplificar
+        stream: false,
+        // Configuração específica para modelos Qwen com pensamento
+        chat_template_kwargs: { enable_thinking: true },
       };
 
       // 6. Fazer requisição para NVIDIA NIM
@@ -450,7 +536,13 @@ Diretrizes adicionais:
       }
 
       const data = await response!.json();
-      const assistantContent = data.choices[0]?.message?.content || "Desculpe, não consegui processar sua mensagem no momento.";
+      console.log("[v0] NVIDIA NIM Response:", JSON.stringify(data, null, 2));
+      
+      // Extrair conteúdo da resposta, processando possíveis tags de pensamento
+      const rawContent = data.choices?.[0]?.message?.content || "";
+      const assistantContent = extractContentFromResponse(rawContent) || "Desculpe, não consegui processar sua mensagem no momento.";
+      
+      console.log("[v0] Extracted content:", assistantContent);
       
       // 7. Adicionar mensagem da assistente na UI
       const assistantMessage: Message = {
@@ -569,9 +661,9 @@ Diretrizes adicionais:
                       : "bg-muted"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+                  <div className="text-sm whitespace-pre-wrap">
+                    <SimpleMarkdown content={message.content} />
+                  </div>
                   <p
                     className={`text-xs mt-1 ${
                       message.role === "user"
