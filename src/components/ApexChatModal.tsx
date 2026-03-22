@@ -264,7 +264,7 @@ const envNim = ((import.meta as any)?.env ?? {}) as Record<string, string | unde
 const NVIDIA_NIM_CONFIG = {
   baseUrl: envNim.VITE_NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
   apiKey: envNim.VITE_NVIDIA_API_KEY || "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",
-  model: envNim.VITE_NVIDIA_MODEL || "qwen/qwen3.5-122b-a10b",
+  model: envNim.VITE_NVIDIA_MODEL || "z-ai/glm4.7",
 };
 
 // Função para extrair o conteúdo da resposta, removendo tags de pensamento do modelo
@@ -479,12 +479,10 @@ Diretrizes adicionais:
           ...conversationHistory,
           { role: "user", content: userContent }
         ],
-        max_tokens: 16384,
-        temperature: 0.60,
+        max_tokens: 4096,
+        temperature: 0.7,
         top_p: 0.95,
         stream: false,
-        // Configuração específica para modelos Qwen com pensamento
-        chat_template_kwargs: { enable_thinking: true },
       };
 
       // 6. Fazer requisição para NVIDIA NIM
@@ -536,13 +534,10 @@ Diretrizes adicionais:
       }
 
       const data = await response!.json();
-      console.log("[v0] NVIDIA NIM Response:", JSON.stringify(data, null, 2));
       
       // Extrair conteúdo da resposta, processando possíveis tags de pensamento
       const rawContent = data.choices?.[0]?.message?.content || "";
       const assistantContent = extractContentFromResponse(rawContent) || "Desculpe, não consegui processar sua mensagem no momento.";
-      
-      console.log("[v0] Extracted content:", assistantContent);
       
       // 7. Adicionar mensagem da assistente na UI
       const assistantMessage: Message = {
