@@ -260,8 +260,12 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit & {
   }
 };
 
-// Configuração da API do chat (usando Groq via Vercel Serverless Function)
-const CHAT_API_URL = "/api/chat";
+// Configuração da API do Groq (chamada direta)
+const GROQ_CONFIG = {
+  baseUrl: "https://api.groq.com/openai/v1",
+  apiKey: "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",
+  model: "llama-3.3-70b-versatile",
+};
 
 // Componente para renderizar Markdown básico
 const SimpleMarkdown = ({ content }: { content: string }) => {
@@ -350,12 +354,12 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
   useEffect(() => {
     if (!isOpen || !user) return;
 
+    // Query simples sem orderBy composto para evitar necessidade de índices
     const chatRef = collection(db, "chat_messages");
     const q = query(
       chatRef,
       where("userId", "==", user.uid),
-      orderBy("createdAt", "asc"),
-      limit(50)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -370,7 +374,13 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
         });
       });
 
-      if (history.length > 0) {
+      // Ordenar no cliente por timestamp
+      history.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+      // Limitar aos últimos 50 mensagens
+      const recentHistory = history.slice(-50);
+
+      if (recentHistory.length > 0) {
         setMessages([
           {
             id: "welcome",
@@ -378,7 +388,7 @@ const ApexChatModal = ({ isOpen, onClose }: ApexChatModalProps) => {
             content: `Olá! Eu sou o **APEX Chat**, seu assistente virtual. Como posso ajudá-lo hoje?`,
             timestamp: new Date(),
           },
-          ...history
+          ...recentHistory
         ]);
       }
     });
@@ -451,41 +461,46 @@ Diretrizes adicionais:
         ? `${systemPrompt}\n\n${produtosContext.context}`
         : systemPrompt;
 
+      // Montar mensagens no formato da API OpenAI (compatível com Groq)
       const apiMessages = [
+        { role: "system", content: fullSystemPrompt },
         ...conversationHistory,
         { role: "user", content: userContent }
       ];
 
-      // 6. Fazer requisição para a API Groq (via Vercel Serverless Function)
+      // 6. Fazer requisição direta para a API Groq
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         throw new Error("Sem conexao com a internet");
       }
 
-      const response = await fetchWithTimeout(CHAT_API_URL, {
+      const response = await fetchWithTimeout(`${GROQ_CONFIG.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROQ_CONFIG.apiKey}`,
         },
         body: JSON.stringify({
+          model: GROQ_CONFIG.model,
           messages: apiMessages,
-          systemPrompt: fullSystemPrompt,
+          max_tokens: 4096,
+          temperature: 0.7,
         }),
-        timeoutMs: 30000,
+        timeoutMs: 60000,
       } as any);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error("Chat API Error:", response.status, errorData);
+        console.error("Groq API Error:", response.status, errorData);
         
         if (response.status === 429) {
           throw new Error("Limite de requisicoes excedido. Aguarde um momento.");
         } else {
-          throw new Error(errorData.error || `Erro na API: ${response.status}`);
+          throw new Error(errorData.error?.message || `Erro na API: ${response.status}`);
         }
       }
 
       const data = await response.json();
-      const assistantContent = data.content || "Desculpe, nao consegui processar sua mensagem no momento.";
+      const assistantContent = data.choices?.[0]?.message?.content || "Desculpe, nao consegui processar sua mensagem no momento.";
       
       // 7. Adicionar mensagem da assistente na UI
       const assistantMessage: Message = {
